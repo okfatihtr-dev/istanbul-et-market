@@ -519,7 +519,7 @@ function renderEntry(accessPoints){
     </div>
     <div class="table-card">
       <div class="table-head"><h3>${POINTS.find(p=>p.id===entryState.pointId)?.name} — ${fmtDate(entryState.date)}</h3><span style="font-size:11px;color:var(--text3);">Нажмите строку</span></div>
-      <table><thead><tr><th>Категория</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th>Статус</th><th></th></tr></thead>
+      <table style="table-layout:fixed;width:100%;"><colgroup><col style="width:28%"><col style="width:16%"><col style="width:16%"><col style="width:16%"><col style="width:14%"><col style="width:10%"></colgroup><thead><tr><th>Категория</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th>Статус</th><th></th></tr></thead>
       <tbody>${rows||'<tr><td colspan="5"><div class="empty">Нет категорий</div></td></tr>'}</tbody></table>
     </div>
     ${dayE.length>0?`
@@ -719,17 +719,13 @@ function renderExpenses(accessPoints){
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
       <button class="btn btn-primary" id="add-exp-btn">+ Добавить расход</button>
     </div>
-    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;">
-      <colgroup><col style="width:12%"><col style="width:18%"><col style="width:13%"><col style="width:42%"><col style="width:15%"></colgroup>
-      <thead><tr><th>Дата</th><th>Тип</th><th class="num">Сумма</th><th>Описание</th><th></th></tr></thead>
+    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:12%"><col style="width:18%"><col style="width:13%"><col style="width:42%"><col style="width:15%"></colgroup><thead><tr><th>Дата</th><th>Тип</th><th class="num">Сумма</th><th>Описание</th><th></th></tr></thead>
       <tbody>${expRows||'<tr><td colspan="5"><div class="empty">Нет расходов для этой точки</div></td></tr>'}</tbody>
     </table></div>`:`
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
       <button class="btn btn-primary" id="add-sal-btn">+ Добавить зарплату</button>
     </div>
-    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;">
-      <colgroup><col style="width:15%"><col style="width:40%"><col style="width:20%"><col style="width:25%"></colgroup>
-      <thead><tr><th>Период</th><th>Сотрудник</th><th class="num">Сумма</th><th></th></tr></thead>
+    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:15%"><col style="width:40%"><col style="width:20%"><col style="width:25%"></colgroup><thead><tr><th>Период</th><th>Сотрудник</th><th class="num">Сумма</th><th></th></tr></thead>
       <tbody>${salRows||'<tr><td colspan="4"><div class="empty">Нет зарплат для этой точки</div></td></tr>'}</tbody>
     </table></div>`}
     ${expModal}${salModal}
@@ -894,17 +890,7 @@ function renderReport(accessPoints){
     <div class="table-card" style="margin-bottom:20px;">
       <div class="table-head"><h3>📍 Все точки — сравнение</h3></div>
       <div class="table-scroll" style="overflow-x:auto;">
-      <table style="table-layout:fixed;min-width:680px;width:100%;">
-        <colgroup><col style="width:22%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:10%"></colgroup>
-        <thead><tr>
-  <th>Точка</th>
-  <th class="num">Закуп</th>
-  <th class="num">Продажа</th>
-  <th class="num">Остаток</th>
-  <th class="num">Расходы</th>
-  <th class="num">Прибыль</th>
-  <th class="num">Рент-сть</th>
-</tr></thead>
+      <table style="table-layout:fixed;min-width:650px;width:100%;"><colgroup><col style="width:22%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:10%"></colgroup><thead><tr><th>Точка</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th class="num">Расходы</th><th class="num">Прибыль</th><th class="num">Рент-сть</th></tr></thead>
         <tbody>
           ${consolidatedRows}
           <tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--accent);">
@@ -1048,8 +1034,7 @@ function renderReport(accessPoints){
       </div>
     </div>
 
-    <div class="table-card"><div class="table-scroll"><table>
-      <thead><tr><th style="min-width:140px;">Категория</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th class="num">Дней</th><th class="num">Рент-сть</th></tr></thead>
+    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;min-width:620px;width:100%;"><colgroup><col style="width:22%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:10%"><col style="width:12%"></colgroup><thead><tr><th>Категория</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th class="num">Дней</th><th class="num">Рент-сть</th></tr></thead>
       <tbody>
         ${catData.map(c=>{
           const cm = c.totS>0?(((c.totS-c.totR)/c.totS)*100).toFixed(1):'—';
