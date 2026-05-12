@@ -68,9 +68,11 @@ thead tr{background:var(--bg3);}
 thead th{padding:9px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;} thead th.num{text-align:right;}
 tbody tr{border-top:1px solid var(--border);}
 tbody tr:hover{background:var(--hover);}
-tbody td{padding:10px 14px;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+tbody td{padding:10px 14px;font-size:13px;color:var(--text);vertical-align:middle;}
+.txt-cut{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 tbody td.num{text-align:right;font-variant-numeric:tabular-nums;}
 thead th.num{text-align:right;}
+.actions-cell{display:flex;gap:6px;align-items:center;justify-content:flex-end;min-height:32px;}
 .badge{display:inline-flex;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;}
 .badge-y{background:rgba(245,158,11,.15);color:var(--accent);}
 .badge-g{background:rgba(16,185,129,.15);color:var(--accent3);}
@@ -442,7 +444,7 @@ function renderDashboard(accessPoints){
 
   const rows = pts.map(p=>{
     const pe=todE.filter(e=>e.point_id===p.id);
-    return `<tr><td><span class="badge badge-y">${p.name}</span></td><td>${fmt(pe.reduce((s,e)=>s+Number(e.received||0),0))}</td><td style="color:var(--accent);font-weight:500;">${fmt(pe.reduce((s,e)=>s+Number(e.sold||0),0))}</td><td style="color:var(--accent3);">${fmt(pe.reduce((s,e)=>s+Number(e.remaining||0),0))}</td><td>${pe.length}</td></tr>`;
+    return `<tr><td class="txt-cut"><span class="badge badge-y">${p.name}</span></td><td class="num">${fmt(pe.reduce((s,e)=>s+Number(e.received||0),0))}</td><td class="num" style="color:var(--accent);font-weight:500;">${fmt(pe.reduce((s,e)=>s+Number(e.sold||0),0))}</td><td class="num" style="color:var(--accent3);">${fmt(pe.reduce((s,e)=>s+Number(e.remaining||0),0))}</td><td class="num">${pe.length}</td></tr>`;
   }).join('');
 
   return `
@@ -494,12 +496,11 @@ function renderEntry(accessPoints){
   const rows = cats.map(cat=>{
     const e=dayE.find(x=>x.category===cat);
     return `<tr style="cursor:pointer;" data-entry-cat="${cat}">
-      <td data-label="Категория"><b>${cat}</b></td>
-      <td data-label="Закуп">${e?fmt(e.received):'<span style="color:var(--text3)">—</span>'}</td>
-      <td>${e?`<span style="color:var(--accent);font-weight:500;">${fmt(e.sold)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
-      <td>${e?`<span style="color:var(--accent3);">${fmt(e.remaining)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+      <td class="txt-cut"><b>${cat}</b></td>
+      <td class="num">${e?fmt(e.received):'<span style="color:var(--text3)">—</span>'}</td>
+      <td class="num">${e?`<span style="color:var(--accent);font-weight:500;">${fmt(e.sold)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+      <td class="num">${e?`<span style="color:var(--accent3);">${fmt(e.remaining)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
       <td>${e?'<span class="badge badge-g">✓ Введено</span>':'<span class="badge badge-y">Ожидает</span>'}</td>
-      <td></td>
     </tr>`;
   }).join('');
 
@@ -520,8 +521,8 @@ function renderEntry(accessPoints){
     </div>
     <div class="table-card">
       <div class="table-head"><h3>${POINTS.find(p=>p.id===entryState.pointId)?.name} — ${fmtDate(entryState.date)}</h3><span style="font-size:11px;color:var(--text3);">Нажмите строку</span></div>
-      <table style="table-layout:fixed;width:100%;"><colgroup><col style="width:28%"><col style="width:16%"><col style="width:16%"><col style="width:16%"><col style="width:14%"><col style="width:10%"></colgroup><thead><tr><th>Категория</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th>Статус</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="6"><div class="empty">Нет категорий</div></td></tr>'}</tbody></table>
+      <table style="table-layout:fixed;width:100%;"><colgroup><col style="width:32%"><col style="width:17%"><col style="width:17%"><col style="width:17%"><col style="width:17%"></colgroup><thead><tr><th>Категория</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th>Статус</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="5"><div class="empty">Нет категорий</div></td></tr>'}</tbody></table>
     </div>
     ${dayE.length>0?`
     <div class="stats-grid" style="margin-top:14px;">
@@ -598,23 +599,27 @@ function renderExpenses(accessPoints){
   }).join('');
 
   const expRows = visExp.map(e=>`<tr>
-    <td data-label="Дата">${fmtDate(e.date)}</td>
-    <td data-label="Тип">${e.type}</td>
-    <td data-label="Сумма" class="num" style="color:var(--accent2);font-weight:500;">${fmt(e.amount)}</td>
-    <td data-label="Описание" style="color:var(--text3);">${e.description||'—'}</td>
-    <td style="display:flex;gap:4px;">
-      <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-edit-exp='${JSON.stringify({id:e.id,date:e.date,type:e.type,amount:e.amount,description:e.description})}'>✏️</button>
-      ${STATE.user.role==='admin'?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-exp="${e.id}">✕</button>`:''}
+    <td class="txt-cut">${fmtDate(e.date)}</td>
+    <td class="txt-cut">${e.type}</td>
+    <td class="num" style="color:var(--accent2);font-weight:500;">${fmt(e.amount)}</td>
+    <td class="txt-cut" style="color:var(--text3);">${e.description||'—'}</td>
+    <td>
+      <div class="actions-cell">
+        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-edit-exp='${JSON.stringify({id:e.id,date:e.date,type:e.type,amount:e.amount,description:e.description})}'>✏️</button>
+        ${STATE.user.role==='admin'?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-exp="${e.id}">✕</button>`:''}
+      </div>
     </td>
   </tr>`).join('');
 
   const salRows = visSal.map(s=>`<tr>
-    <td data-label="Период">${(()=>{const p=s.period||"";const[y,m]=p.split("-");return m&&y?m+"."+y:p;})()}</td>
-    <td data-label="Сотрудник">${s.employee}</td>
-    <td data-label="Сумма" class="num" style="color:var(--accent2);font-weight:500;">${fmt(s.amount)}</td>
-    <td style="display:flex;gap:4px;">
-      <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-edit-sal='${JSON.stringify({id:s.id,period:s.period,employee:s.employee,amount:s.amount})}'>✏️</button>
-      ${STATE.user.role==='admin'?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-sal="${s.id}">✕</button>`:''}
+    <td class="txt-cut">${(()=>{const p=s.period||"";const[y,m]=p.split("-");return m&&y?m+"."+y:p;})()}</td>
+    <td class="txt-cut">${s.employee}</td>
+    <td class="num" style="color:var(--accent2);font-weight:500;">${fmt(s.amount)}</td>
+    <td>
+      <div class="actions-cell">
+        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-edit-sal='${JSON.stringify({id:s.id,period:s.period,employee:s.employee,amount:s.amount})}'>✏️</button>
+        ${STATE.user.role==='admin'?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-sal="${s.id}">✕</button>`:''}
+      </div>
     </td>
   </tr>`).join('');
 
@@ -720,13 +725,13 @@ function renderExpenses(accessPoints){
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
       <button class="btn btn-primary" id="add-exp-btn">+ Добавить расход</button>
     </div>
-    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:12%"><col style="width:18%"><col style="width:13%"><col style="width:42%"><col style="width:15%"></colgroup><thead><tr><th>Дата</th><th>Тип</th><th class="num">Сумма</th><th>Описание</th><th></th></tr></thead>
+    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:15%"><col style="width:20%"><col style="width:15%"><col style="width:32%"><col style="width:18%"></colgroup><thead><tr><th>Дата</th><th>Тип</th><th class="num">Сумма</th><th>Описание</th><th></th></tr></thead>
       <tbody>${expRows||'<tr><td colspan="5"><div class="empty">Нет расходов для этой точки</div></td></tr>'}</tbody>
     </table></div>`:`
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
       <button class="btn btn-primary" id="add-sal-btn">+ Добавить зарплату</button>
     </div>
-    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:15%"><col style="width:40%"><col style="width:20%"><col style="width:25%"></colgroup><thead><tr><th>Период</th><th>Сотрудник</th><th class="num">Сумма</th><th></th></tr></thead>
+    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:18%"><col style="width:35%"><col style="width:25%"><col style="width:22%"></colgroup><thead><tr><th>Период</th><th>Сотрудник</th><th class="num">Сумма</th><th></th></tr></thead>
       <tbody>${salRows||'<tr><td colspan="4"><div class="empty">Нет зарплат для этой точки</div></td></tr>'}</tbody>
     </table></div>`}
     ${expModal}${salModal}
@@ -877,13 +882,13 @@ function renderReport(accessPoints){
   // Consolidated point-by-point table (only shown for ALL)
   const consolidatedRows = isAll ? pointSummary.map(({p,pS,pR,pRem,pCosts,pProfit,pMargin})=>`
     <tr>
-      <td><span class="badge badge-y">${p.name}</span></td>
-      <td style="color:#60a5fa;font-weight:500;">${fmt(pR)}</td>
-      <td style="color:var(--accent);font-weight:500;">${fmt(pS)}</td>
-      <td style="color:var(--accent3);">${fmt(pRem)}</td>
-      <td style="color:var(--accent2);">${fmt(pCosts)}</td>
-      <td style="color:${Number(pProfit)>=0?'var(--accent3)':'var(--accent2)'};font-weight:700;">${fmt(pProfit)}</td>
-      <td style="color:${Number(pMargin)>=0?'var(--accent3)':'var(--accent2)'};font-weight:700;">${pMargin}%</td>
+      <td class="txt-cut"><span class="badge badge-y">${p.name}</span></td>
+      <td class="num" style="color:#60a5fa;font-weight:500;">${fmt(pR)}</td>
+      <td class="num" style="color:var(--accent);font-weight:500;">${fmt(pS)}</td>
+      <td class="num" style="color:var(--accent3);">${fmt(pRem)}</td>
+      <td class="num" style="color:var(--accent2);">${fmt(pCosts)}</td>
+      <td class="num" style="color:${Number(pProfit)>=0?'var(--accent3)':'var(--accent2)'};font-weight:700;">${fmt(pProfit)}</td>
+      <td class="num" style="color:${Number(pMargin)>=0?'var(--accent3)':'var(--accent2)'};font-weight:700;">${pMargin}%</td>
     </tr>`).join('') : '';
 
   const consolidatedSection = isAll ? `
@@ -896,12 +901,12 @@ function renderReport(accessPoints){
           ${consolidatedRows}
           <tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--accent);">
             <td>ИТОГО ВСЕ</td>
-            <td style="color:#60a5fa;">${fmt(totBought)}</td>
-            <td style="color:var(--accent);">${fmt(totSold)}</td>
-            <td style="color:var(--accent3);">${fmt(totRem)}</td>
-            <td style="color:var(--accent2);">${fmt(totCosts)}</td>
-            <td style="color:${profit>=0?'var(--accent3)':'var(--accent2)'};">${fmt(profit)}</td>
-            <td style="color:${profit>=0?'var(--accent3)':'var(--accent2)'};">${marginPct}%</td>
+            <td class="num" style="color:#60a5fa;">${fmt(totBought)}</td>
+            <td class="num" style="color:var(--accent);">${fmt(totSold)}</td>
+            <td class="num" style="color:var(--accent3);">${fmt(totRem)}</td>
+            <td class="num" style="color:var(--accent2);">${fmt(totCosts)}</td>
+            <td class="num" style="color:${profit>=0?'var(--accent3)':'var(--accent2)'};">${fmt(profit)}</td>
+            <td class="num" style="color:${profit>=0?'var(--accent3)':'var(--accent2)'};">${marginPct}%</td>
           </tr>
         </tbody>
       </table>
@@ -951,8 +956,8 @@ function renderReport(accessPoints){
   </tr>`).join('');
 
   const expRows = [
-    ...ptExp.map(e=>`<tr><td>${fmtDate(e.date)}</td><td><span class="badge badge-r">${e.type}</span></td><td style="color:var(--accent2);">${fmt(e.amount)}</td><td style="color:var(--text3);">${e.description||'—'}</td></tr>`),
-    ...ptSal.map(s=>`<tr><td data-label="Период">${(()=>{const p=s.period||"";const[y,m]=p.split("-");return m&&y?m+"."+y:p;})()}</td><td><span class="badge badge-r">Зарплата</span></td><td style="color:var(--accent2);">${fmt(s.amount)}</td><td style="color:var(--text3);">${s.employee}</td></tr>`),
+    ...ptExp.map(e=>`<tr><td>${fmtDate(e.date)}</td><td><span class="badge badge-r">${e.type}</span></td><td class="num" style="color:var(--accent2);">${fmt(e.amount)}</td><td class="txt-cut" style="color:var(--text3);">${e.description||'—'}</td></tr>`),
+    ...ptSal.map(s=>`<tr><td>${(()=>{const p=s.period||"";const[y,m]=p.split("-");return m&&y?m+"."+y:p;})()}</td><td><span class="badge badge-r">Зарплата</span></td><td class="num" style="color:var(--accent2);">${fmt(s.amount)}</td><td class="txt-cut" style="color:var(--text3);">${s.employee}</td></tr>`),
   ].join('');
 
   // Store for export buttons
@@ -1151,13 +1156,15 @@ function renderUsers(){
     return '<div class="loading-screen" style="min-height:200px;"><div class="spinner"></div></div>';
   }
   const rows = usersData.map(u=>`<tr>
-    <td>${u.name}</td>
-    <td><code style="font-size:11px;background:var(--bg3);padding:2px 6px;border-radius:4px;">${u.login}</code></td>
+    <td class="txt-cut">${u.name}</td>
+    <td class="txt-cut"><code style="font-size:11px;background:var(--bg3);padding:2px 6px;border-radius:4px;">${u.login}</code></td>
     <td><span class="badge ${u.role==='admin'?'badge-y':'badge-b'}">${u.role==='admin'?'Администратор':'Оператор'}</span></td>
-    <td>${u.point_id?POINTS.find(p=>p.id===u.point_id)?.name||u.point_id:'<span style="color:var(--text3)">Все точки</span>'}</td>
-    <td style="display:flex;gap:6px;flex-wrap:wrap;">
-      <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-pass-user="${u.id}" data-pass-name="${u.name}">🔑 Şifre</button>
-      ${u.id!==STATE.user.id?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-user="${u.id}">✕</button>`:''}
+    <td class="txt-cut">${u.point_id?POINTS.find(p=>p.id===u.point_id)?.name||u.point_id:'<span style="color:var(--text3)">Все точки</span>'}</td>
+    <td>
+      <div class="actions-cell">
+        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-pass-user="${u.id}" data-pass-name="${u.name}">🔑 Şifre</button>
+        ${u.id!==STATE.user.id?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-user="${u.id}">✕</button>`:''}
+      </div>
     </td>
   </tr>`).join('');
 
@@ -1198,7 +1205,7 @@ function renderUsers(){
 
   return `
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;"><button class="btn btn-primary" id="add-user-btn">+ Добавить</button></div>
-    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:25%"><col style="width:15%"><col style="width:18%"><col style="width:30%"><col style="width:12%"></colgroup><thead><tr><th>Имя</th><th>Логин</th><th>Роль</th><th>Точка</th><th></th></tr></thead>
+    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:25%"><col style="width:15%"><col style="width:15%"><col style="width:25%"><col style="width:20%"></colgroup><thead><tr><th>Имя</th><th>Логин</th><th>Роль</th><th>Точка</th><th></th></tr></thead>
       <tbody>${rows||'<tr><td colspan="5"><div class="empty">Нет пользователей</div></td></tr>'}</tbody>
     </table></div></div>
     ${modal}
