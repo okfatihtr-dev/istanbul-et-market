@@ -1,0 +1,2142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Учёт Системы</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#1a1d23;--bg2:#22262f;--bg3:#2a2f3a;--border:#363c4a;
+  --accent:#f59e0b;--accent2:#f87171;--accent3:#34d399;
+  --text:#f0f2f7;--text2:#b0bac8;--text3:#7a8499;
+  --card:#22262f;--hover:#2e3342;
+}
+.light{
+  --bg:#f0f2f7;--bg2:#ffffff;--bg3:#e8eaf0;--border:#d0d5e0;
+  --text:#1a1e2e;--text2:#4a5568;--text3:#8892a4;
+  --card:#ffffff;--hover:#f5f7fc;
+}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;transition:background .3s,color .3s;}
+.app{display:flex;min-height:100vh;}
+.sidebar{width:250px;min-height:100vh;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100;}
+.logo{padding:20px;border-bottom:1px solid var(--border);}
+.logo h1{font-family:'Unbounded',sans-serif;font-size:12px;font-weight:700;color:var(--accent);line-height:1.4;}
+.logo p{font-size:10px;color:var(--text3);margin-top:4px;}
+.nav{flex:1;padding:12px 0;overflow-y:auto;}
+.nav-label{font-size:9px;font-weight:600;color:var(--text2);letter-spacing:.15em;text-transform:uppercase;padding:8px 16px 4px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;border-left:3px solid transparent;font-size:13px;color:var(--text2);transition:all .2s;}
+.nav-item:hover{background:var(--hover);color:var(--text);}
+.nav-item.active{background:var(--hover);color:var(--accent);border-left-color:var(--accent);font-weight:500;}
+.sidebar-footer{padding:12px;border-top:1px solid var(--border);}
+.user-badge{display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg3);border-radius:10px;}
+.user-avatar{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;flex-shrink:0;}
+.user-info p{font-size:12px;font-weight:500;}
+.user-info span{font-size:10px;color:var(--text3);}
+.logout-btn{margin-left:auto;background:none;border:none;cursor:pointer;font-size:16px;color:var(--text3);}
+.main{margin-left:250px;flex:1;display:flex;flex-direction:column;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;}
+.topbar h2{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:600;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.content{padding:24px;flex:1;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:500;font-family:'Inter',sans-serif;transition:all .2s;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-primary{background:var(--accent);color:#000;}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover:not(:disabled){background:var(--hover);}
+.btn-danger{background:rgba(239,68,68,.1);color:var(--accent2);border:1px solid rgba(239,68,68,.2);}
+.btn-success{background:rgba(16,185,129,.1);color:var(--accent3);border:1px solid rgba(16,185,129,.2);}
+.theme-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:15px;}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.stat-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;}
+.stat-value{font-family:'Unbounded',sans-serif;font-size:18px;font-weight:700;}
+.stat-value.y{color:var(--accent);}
+.stat-value.g{color:var(--accent3);}
+.stat-value.r{color:var(--accent2);}
+.stat-value.b{color:#60a5fa;}
+.stat-sub{font-size:10px;color:var(--text2);margin-top:4px;}
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+.table-card .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.table-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);}
+.table-head h3{font-size:13px;font-weight:600;}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--bg3);}
+thead th{padding:9px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;} thead th.num{text-align:right;}
+tbody tr{border-top:1px solid var(--border);}
+tbody tr:hover{background:var(--hover);}
+tbody td{padding:10px 14px;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+tbody td.num{text-align:right;font-variant-numeric:tabular-nums;}
+thead th.num{text-align:right;}
+.badge{display:inline-flex;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;}
+.badge-y{background:rgba(245,158,11,.15);color:var(--accent);}
+.badge-g{background:rgba(16,185,129,.15);color:var(--accent3);}
+.badge-r{background:rgba(239,68,68,.15);color:var(--accent2);}
+.badge-b{background:rgba(59,130,246,.15);color:#60a5fa;}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-group label{font-size:10px;font-weight:600;color:var(--text);text-transform:uppercase;letter-spacing:.08em;}
+.form-control{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text);font-family:'Inter',sans-serif;outline:none;width:100%;transition:border-color .2s;} .form-control::placeholder{color:var(--text3);}
+.form-control:focus{border-color:var(--accent);}
+select.form-control option{background:var(--bg2);}
+.section-title{font-family:'Unbounded',sans-serif;font-size:10px;font-weight:600;color:var(--text2);letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+.tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;}
+.tab{padding:7px 14px;border-radius:8px;border:1px solid var(--border);font-size:12px;font-weight:500;cursor:pointer;background:var(--bg2);color:var(--text2);transition:all .2s;}
+.tab:hover{color:var(--text);border-color:var(--accent);}
+.tab.active{background:var(--accent);color:#000;border-color:var(--accent);}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);}
+.modal-head h3{font-family:'Unbounded',sans-serif;font-size:12px;font-weight:600;}
+.modal-body{padding:20px;}
+.modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--border);}
+.close-btn{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:13px;color:var(--text2);}
+.alert{padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px;}
+.alert-warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:var(--accent);}
+.alert-success{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--accent3);}
+.alert-error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--accent2);}
+.profit-box{background:linear-gradient(135deg,rgba(16,185,129,.1),rgba(16,185,129,.02));border:1px solid rgba(16,185,129,.25);border-radius:12px;padding:20px;text-align:center;margin-bottom:18px;}
+.profit-label{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;}
+.profit-value{font-family:'Unbounded',sans-serif;font-size:26px;font-weight:700;}
+.profit-sub{font-size:10px;color:var(--text3);margin-top:4px;}
+.bar-chart{display:flex;flex-direction:column;gap:10px;padding:14px;}
+.bar-row{display:flex;align-items:center;gap:10px;}
+.bar-label{font-size:11px;color:var(--text2);width:80px;flex-shrink:0;text-align:right;}
+.bar-track{flex:1;height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;background:var(--accent);transition:width .6s ease;}
+.bar-val{font-size:11px;color:var(--text);width:90px;text-align:right;font-weight:500;}
+.empty{text-align:center;padding:36px;color:var(--text3);font-size:13px;}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:14px;}
+.loading-screen p{color:var(--text3);font-size:13px;}
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:36px;width:100%;max-width:380px;}
+.login-logo{text-align:center;margin-bottom:28px;}
+.login-logo h1{font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:var(--accent);}
+.login-logo p{font-size:10px;color:var(--text3);margin-top:4px;text-transform:uppercase;letter-spacing:.1em;}
+.online-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent3);margin-right:5px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.top-alert{position:fixed;top:16px;right:16px;z-index:999;min-width:260px;box-shadow:0 4px 20px rgba(0,0,0,.3);}
+
+/* ── MOBILE ── */
+.hamburger{display:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:18px;align-items:center;justify-content:center;}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;backdrop-filter:blur(2px);}
+.sidebar-overlay.open{display:block;}
+@media(max-width:768px){
+  .hamburger{display:flex;}
+  .sidebar{transform:translateX(-100%);transition:transform .3s;z-index:100;}
+  .sidebar.open{transform:translateX(0);}
+  .main{margin-left:0;}
+  .content{padding:14px;}
+  .topbar{padding:10px 14px;}
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px;}
+  .stat-card{padding:14px;}
+  .stat-value{font-size:15px;}
+
+  /* Tables → card view on mobile */
+  /* mobile-cards only on very small screens */
+
+  .point-tabs,.tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;}
+  .tab,.point-tab{flex-shrink:0;}
+  .form-grid{grid-template-columns:1fr;}
+  .modal{margin:8px;max-height:95vh;}
+  .profit-box .profit-value{font-size:20px;}
+  .topbar h2{font-size:12px;}
+  .btn{font-size:11px;padding:7px 12px;}
+}
+@media(max-width:480px){
+  .hide-mobile{display:none;}
+  .stats-grid{grid-template-columns:1fr;}
+  .topbar-right .btn span{display:none;}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const SUPABASE_URL = 'https://ejcsyiseajqvidrvnxbl.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_euNwrhhUCWpF_q0jUHZmmw_I4Zbcd2X';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const POINTS = [
+  {id:'mkr17',name:'17-й Микрорайон',short:'17 МКР'},
+  {id:'mkr5', name:'5-й Микрорайон', short:'5 МКР'},
+  {id:'baza', name:'База',           short:'База'},
+  {id:'polf', name:'Полфабрикат',    short:'Полф.'},
+  {id:'ofis', name:'Офис',           short:'Офис'},
+];
+const CATS = {
+  mkr17:['Мясо','Курица','Баранина','Конина','Салаты','Полфабрикат','Маркет'],
+  mkr5: ['Мясо','Курица','Баранина','Конина','Полфабрикат','Маркет'],
+  baza: ['Мясо','Курица','Баранина','Конина'],
+  polf: ['Полфабрикат'],
+  ofis: [],
+};
+EXP_TYPES_DEFAULT = ['Аренда','Зарплата','Электричество','Транспорт','Коммунальные','Уборка','Упаковка','Ремонт','Прочее'];
+function getExpTypes(){
+  try{ const s=localStorage.getItem('exp_types'); return s?JSON.parse(s):EXP_TYPES_DEFAULT; }
+  catch{return EXP_TYPES_DEFAULT;}
+}
+function saveExpTypes(arr){
+  localStorage.setItem('exp_types', JSON.stringify(arr));
+}
+const PAGE_TITLES = {dashboard:'Главная панель',entry:'Ввод данных',expenses:'Расходы / Зарплаты',bank:'Банк (Офис)',report:'Отчёт',users:'Пользователи',profile:'Мой профиль',staff:'Персонал / Зарплаты',cariler:'Карточки должников'};
+
+function fmt(n){if(!n&&n!==0)return '—';return Number(n).toLocaleString('ru-KZ')+'₸';}
+function fmtDate(d){
+  if(!d) return '—';
+  const s = String(d).trim();
+  // Already DD.MM.YYYY
+  if(/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return s;
+  // YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)){
+    const [y,m,day] = s.slice(0,10).split('-');
+    return `${day}.${m}.${y}`;
+  }
+  return s;
+}
+function today(){return new Date().toISOString().split('T')[0];}
+function getLast(n){const d=[];for(let i=n-1;i>=0;i--){const x=new Date();x.setDate(x.getDate()-i);d.push(x.toISOString().split('T')[0]);}return d;}
+
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let STATE = {
+  theme: localStorage.getItem('theme')||'dark',
+  user: null,
+  page: 'dashboard',
+  loading: true,
+  dataLoaded: false,
+  entries: [],
+  expenses: [],
+  salaries: [],
+  bankTx: [],
+  alert: null,
+  alertTimer: null,
+};
+
+function setState(patch){
+  Object.assign(STATE, patch);
+  render();
+}
+
+function showAlert(type, msg){
+  if(STATE.alertTimer) clearTimeout(STATE.alertTimer);
+  const t = setTimeout(()=>setState({alert:null,alertTimer:null}), 3500);
+  setState({alert:{type,msg}, alertTimer:t});
+}
+
+// ─── SUPABASE ───────────────────────────────────────────────────────────────
+async function loadAll(){
+  setState({dataLoaded:false});
+  try{
+    const [e,ex,sal,bk] = await Promise.all([
+      sb.from('daily_entries').select('*').order('date',{ascending:false}),
+      sb.from('expenses').select('*').order('date',{ascending:false}),
+      sb.from('salaries').select('*').order('created_at',{ascending:false}),
+      sb.from('bank_transactions').select('*').order('created_at',{ascending:false}),
+    ]);
+    setState({entries:e.data||[], expenses:ex.data||[], salaries:sal.data||[], bankTx:bk.data||[], dataLoaded:true});
+  }catch(err){
+    setState({dataLoaded:true});
+    showAlert('error','Ошибка загрузки: '+err.message);
+  }
+}
+
+async function doLogin(login, password){
+  const {data,error} = await sb.from('users').select('*').eq('login',login).eq('password',password).single();
+  if(error||!data) throw new Error('Неверный логин или пароль');
+  sessionStorage.setItem('uchet_user', JSON.stringify(data));
+  setState({user:data});
+  await loadAll();
+}
+
+function doLogout(){
+  sessionStorage.removeItem('uchet_user');
+  setState({user:null, entries:[], expenses:[], salaries:[], bankTx:[], dataLoaded:false, page:'dashboard'});
+}
+
+function applyTheme(t){
+  document.body.className = t==='light'?'light':'';
+  localStorage.setItem('theme',t);
+}
+
+// ─── RENDER ─────────────────────────────────────────────────────────────────
+function render(){
+  applyTheme(STATE.theme);
+  const app = document.getElementById('app');
+  if(!app) return;
+
+  if(STATE.loading){
+    app.innerHTML = `<div class="loading-screen"><div class="spinner"></div><p>Загрузка...</p></div>`;
+    return;
+  }
+  if(!STATE.user){
+    app.innerHTML = renderLogin();
+    bindLogin();
+    return;
+  }
+  if(!STATE.dataLoaded){
+    app.innerHTML = `<div class="loading-screen"><div class="spinner"></div><p>Загрузка данных...</p></div>`;
+    return;
+  }
+
+  const accessPoints = STATE.user.role==='admin' ? POINTS : POINTS.filter(p=>p.id===STATE.user.point_id);
+
+  app.innerHTML = `
+    ${STATE.alert ? `<div class="top-alert alert alert-${STATE.alert.type}">${STATE.alert.msg}</div>` : ''}
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <div class="app">
+      ${renderSidebar(accessPoints)}
+      <div class="main">
+        ${renderTopbar()}
+        <div class="content" id="page-content">
+          ${renderPage(accessPoints)}
+        </div>
+      </div>
+    </div>
+  `;
+  bindEvents(accessPoints);
+}
+
+// ─── LOGIN ──────────────────────────────────────────────────────────────────
+function renderLogin(){
+  return `
+    <div class="login-screen">
+      <div style="position:absolute;top:14px;right:14px;">
+        <button class="theme-btn" id="theme-btn-login">${STATE.theme==='dark'?'☀️':'🌙'}</button>
+      </div>
+      <div class="login-card">
+        <div class="login-logo">
+          <h1>ISTANBUL ET MARKET</h1>
+          <p>Управление точками продаж</p>
+        </div>
+        <div id="login-err"></div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="form-group"><label>Логин</label><input class="form-control" id="login-input" placeholder="Введите логин" autocomplete="username"/></div>
+          <div class="form-group"><label>Пароль</label><input class="form-control" type="password" id="pass-input" placeholder="Введите пароль" autocomplete="current-password"/></div>
+          <button class="btn btn-primary" id="login-btn" style="justify-content:center;padding:11px;">Войти</button>
+        </div>
+        <div style="margin-top:14px;font-size:11px;color:var(--text3);text-align:center;"><span class="online-dot"></span>Подключено к облаку</div>
+      </div>
+    </div>
+  `;
+}
+
+function bindLogin(){
+  document.getElementById('theme-btn-login')?.addEventListener('click',()=>setState({theme:STATE.theme==='dark'?'light':'dark'}));
+  const btn = document.getElementById('login-btn');
+  const errDiv = document.getElementById('login-err');
+  async function tryLogin(){
+    const login = document.getElementById('login-input').value.trim();
+    const pass  = document.getElementById('pass-input').value;
+    if(!login||!pass) return;
+    btn.disabled=true; btn.textContent='Вход...';
+    try{ await doLogin(login,pass); }
+    catch(e){
+      errDiv.innerHTML=`<div class="alert alert-error">${e.message}</div>`;
+      btn.disabled=false; btn.textContent='Войти';
+    }
+  }
+  btn?.addEventListener('click', tryLogin);
+  document.getElementById('pass-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')tryLogin();});
+}
+
+// ─── SIDEBAR ────────────────────────────────────────────────────────────────
+function renderSidebar(accessPoints){
+  const nav = [
+    {id:'dashboard',icon:'📊',label:'Главная'},
+    {id:'entry',icon:'📝',label:'Ввод данных'},
+    {id:'expenses',icon:'💸',label:'Расходы / Зарплаты'},
+    {id:'bank',icon:'🏦',label:'Банк (Офис)'},
+    {id:'report',icon:'📈',label:'Отчёт'},
+    ...(STATE.user.role==='admin'?[{id:'users',icon:'👥',label:'Пользователи'}]:[]),
+    ...(STATE.user.role==='admin'?[{id:'staff',icon:'💼',label:'Персонал / Зарплаты'}]:[]),
+    ...(['admin','operator'].includes(STATE.user.role)&&['mkr17','mkr5','baza',null].includes(STATE.user.point_id)?[{id:'cariler',icon:'📒',label:'Карточки должников'}]:[]),
+    {id:'profile',icon:'👤',label:'Мой профиль'},
+  ];
+  const navItems = nav.map(n=>`
+    <div class="nav-item ${STATE.page===n.id?'active':''}" data-page="${n.id}">
+      <span>${n.icon}</span><span>${n.label}</span>
+    </div>
+  `).join('');
+  const pts = accessPoints.map(p=>`<div class="nav-item" style="font-size:11px;"><span>📍</span><span>${p.name}</span></div>`).join('');
+  const u = STATE.user;
+  return `
+    <div class="sidebar">
+      <div class="logo">
+        <h1>ISTANBUL ET MARKET</h1>
+        <p><span class="online-dot"></span>Онлайн · ${u.role==='admin'?'Администратор':'Оператор'}</p>
+      </div>
+      <nav class="nav">
+        <div class="nav-label">Навигация</div>
+        ${navItems}
+        <div class="nav-label" style="margin-top:8px;">Мои точки</div>
+        ${pts}
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-badge">
+          <div class="user-avatar">${u.name[0]}</div>
+          <div class="user-info"><p>${u.name}</p><span>${u.role==='admin'?'Администратор':'Оператор'}</span></div>
+          <button class="logout-btn" id="logout-btn" title="Выйти">↩</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── TOPBAR ─────────────────────────────────────────────────────────────────
+function renderTopbar(){
+  return `
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button class="hamburger" id="hamburger-btn">☰</button>
+        <div><h2>${PAGE_TITLES[STATE.page]||STATE.page}</h2><span style="font-size:11px;color:var(--text3);">${fmtDate(today())}</span></div>
+      </div>
+      <div class="topbar-right">
+        ${STATE.user?.role==='admin'?`<button class="btn btn-success" id="backup-btn" style="padding:6px 12px;"><span>💾</span><span class="hide-mobile"> Yedek Al</span></button>
+        <label class="btn btn-ghost" style="cursor:pointer;padding:6px 12px;" title="Yedekten Geri Yukle">📂<span class="hide-mobile"> Yukle</span><input type="file" id="restore-file" accept=".json" style="display:none;"/></label>`:''}
+        <button class="btn btn-ghost" id="refresh-btn" style="padding:6px 12px;">🔄 Обновить</button>
+        <button class="theme-btn" id="theme-btn">${STATE.theme==='dark'?'☀️':'🌙'}</button>
+      </div>
+    </div>
+  `;
+}
+
+// ─── PAGES ──────────────────────────────────────────────────────────────────
+function renderPage(accessPoints){
+  switch(STATE.page){
+    case 'dashboard': return renderDashboard(accessPoints);
+    case 'entry':     return renderEntry(accessPoints);
+    case 'expenses':  return renderExpenses(accessPoints);
+    case 'bank':      return renderBank();
+    case 'report':    return renderReport(accessPoints);
+    case 'users':     return STATE.user.role==='admin' ? renderUsers() : '';
+    case 'profile':   return renderProfile();
+    case 'staff':     return STATE.user.role==='admin' ? renderStaff() : '';
+    case 'cariler':   return renderCariler();
+    default: return '';
+  }
+}
+
+// ─── DASHBOARD ──────────────────────────────────────────────────────────────
+function renderDashboard(accessPoints){
+  const tod = today();
+  const todE = STATE.entries.filter(e=>e.date===tod);
+  const todEx = STATE.expenses.filter(e=>e.date===tod);
+  const totSales = todE.reduce((s,e)=>s+Number(e.sold||0),0);
+  const totPurch = todE.reduce((s,e)=>s+Number(e.received||0),0);
+  const totRem   = todE.reduce((s,e)=>s+Number(e.remaining||0),0);
+  const totExp   = todEx.reduce((s,e)=>s+Number(e.amount||0),0);
+  const pts = accessPoints.filter(p=>p.id!=='ofis');
+  const maxS = Math.max(...pts.map(p=>todE.filter(e=>e.point_id===p.id).reduce((s,e)=>s+Number(e.sold||0),0)),1);
+
+  const bars = pts.map(p=>{
+    const s = todE.filter(e=>e.point_id===p.id).reduce((x,e)=>x+Number(e.sold||0),0);
+    return `<div class="bar-row"><div class="bar-label">${p.short}</div><div class="bar-track"><div class="bar-fill" style="width:${(s/maxS)*100}%"></div></div><div class="bar-val">${s>0?fmt(s):'—'}</div></div>`;
+  }).join('');
+
+  const rows = pts.map(p=>{
+    const pe=todE.filter(e=>e.point_id===p.id);
+    return `<tr><td><span class="badge badge-y">${p.name}</span></td><td>${fmt(pe.reduce((s,e)=>s+Number(e.received||0),0))}</td><td style="color:var(--accent);font-weight:500;">${fmt(pe.reduce((s,e)=>s+Number(e.sold||0),0))}</td><td style="color:var(--accent3);">${fmt(pe.reduce((s,e)=>s+Number(e.remaining||0),0))}</td><td>${pe.length}</td></tr>`;
+  }).join('');
+
+  return `
+    <div class="section-title">Сегодня — ${fmtDate(tod)}</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Продажи</div><div class="stat-value y">${fmt(totSales)}</div><div class="stat-sub">все точки</div></div>
+      <div class="stat-card"><div class="stat-label">Закуп</div><div class="stat-value b">${fmt(totPurch)}</div><div class="stat-sub">поступления</div></div>
+      <div class="stat-card"><div class="stat-label">Расходы</div><div class="stat-value r">${fmt(totExp)}</div><div class="stat-sub">операционные</div></div>
+      <div class="stat-card"><div class="stat-label">Остаток</div><div class="stat-value g">${fmt(totRem)}</div><div class="stat-sub">склад</div></div>
+    </div>
+    <div class="section-title">Продажи по точкам</div>
+    <div class="table-card"><div class="bar-chart">${bars||'<div class="empty">Нет данных</div>'}</div></div>
+    <div class="section-title">Расходы по точкам (сегодня)</div>
+    <div class="table-card" style="margin-bottom:16px;">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+        ${(()=>{
+          const allPts = accessPoints.filter(p=>p.id!=="ofis");
+          const maxExp = Math.max(...allPts.map(p=>todEx.filter(e=>e.point_id===p.id).reduce((s,e)=>s+Number(e.amount||0),0)),1);
+          return allPts.map(p=>{
+            const exp = todEx.filter(e=>e.point_id===p.id).reduce((s,e)=>s+Number(e.amount||0),0);
+            const bar = (exp/maxExp)*100;
+            return `<div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:80px;font-size:12px;color:var(--text);flex-shrink:0;">${p.short}</div>
+              <div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;">
+                <div style="height:100%;width:${bar}%;background:var(--accent2);border-radius:4px;"></div>
+              </div>
+              <div style="width:90px;text-align:right;font-size:11px;color:var(--accent2);font-weight:600;">${exp>0?fmt(exp):'—'}</div>
+            </div>`;
+          }).join('');
+        })()}
+      </div>
+    </div>
+    <div class="section-title">Детали</div>
+    <div class="table-card"><div class="table-scroll"><table><thead><tr><th>Точка</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th class="num">Записей</th></tr></thead><tbody>${rows||'<tr><td colspan="5"><div class="empty">Нет данных за сегодня</div></td></tr>'}</tbody></table></div></div></div>
+  `;
+}
+
+// ─── ENTRY PAGE ──────────────────────────────────────────────────────────────
+let entryState = {pointId:'', date:today(), saving:false, modal:null};
+
+function renderEntry(accessPoints){
+  const editable = accessPoints.filter(p=>p.id!=='ofis');
+  if(!entryState.pointId && editable[0]) entryState.pointId = editable[0].id;
+  const cats = CATS[entryState.pointId]||[];
+  const dayE = STATE.entries.filter(e=>e.point_id===entryState.pointId&&e.date===entryState.date);
+
+  const tabsHtml = editable.map(p=>`<div class="tab ${entryState.pointId===p.id?'active':''}" data-entry-point="${p.id}">${p.name}</div>`).join('');
+
+  const rows = cats.map(cat=>{
+    const e=dayE.find(x=>x.category===cat);
+    return `<tr style="cursor:pointer;" data-entry-cat="${cat}">
+      <td data-label="Категория"><b>${cat}</b></td>
+      <td data-label="Закуп">${e?fmt(e.received):'<span style="color:var(--text3)">—</span>'}</td>
+      <td>${e?`<span style="color:var(--accent);font-weight:500;">${fmt(e.sold)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+      <td>${e?`<span style="color:var(--accent3);">${fmt(e.remaining)}</span>`:'<span style="color:var(--text3)">—</span>'}</td>
+      <td>${e?'<span class="badge badge-g">✓ Введено</span>':'<span class="badge badge-y">Ожидает</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  const totSales = dayE.reduce((s,e)=>s+Number(e.sold||0),0);
+  const totPurch = dayE.reduce((s,e)=>s+Number(e.received||0),0);
+  const totRem   = dayE.reduce((s,e)=>s+Number(e.remaining||0),0);
+
+  const modalHtml = entryState.modal ? renderEntryModal() : '';
+
+  return `
+    <div class="tabs">${tabsHtml}</div>
+    <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;">
+        <label>Дата</label>
+        <input type="date" class="form-control" id="entry-date" value="${entryState.date}" style="width:170px;"/>
+      </div>
+      <span style="font-size:12px;color:var(--text3);margin-bottom:2px;">Введено: ${dayE.length} из ${cats.length}</span>
+    </div>
+    <div class="table-card">
+      <div class="table-head"><h3>${POINTS.find(p=>p.id===entryState.pointId)?.name} — ${fmtDate(entryState.date)}</h3><span style="font-size:11px;color:var(--text3);">Нажмите строку</span></div>
+      <table><thead><tr><th>Категория</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th>Статус</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="5"><div class="empty">Нет категорий</div></td></tr>'}</tbody></table>
+    </div>
+    ${dayE.length>0?`
+    <div class="stats-grid" style="margin-top:14px;">
+      <div class="stat-card"><div class="stat-label">Продажа</div><div class="stat-value y">${fmt(totSales)}</div></div>
+      <div class="stat-card"><div class="stat-label">Закуп</div><div class="stat-value b">${fmt(totPurch)}</div></div>
+      <div class="stat-card"><div class="stat-label">Остаток</div><div class="stat-value g">${fmt(totRem)}</div></div>
+    </div>`:''}
+    ${modalHtml}
+  `;
+}
+
+function renderEntryModal(){
+  const {cat, existing} = entryState.modal;
+  const prev = new Date(entryState.date); prev.setDate(prev.getDate()-1);
+  const prevStr = prev.toISOString().split('T')[0];
+  const prevE = STATE.entries.find(e=>e.point_id===entryState.pointId&&e.date===prevStr&&e.category===cat);
+  const m = entryState.modal;
+  return `
+    <div class="modal-overlay" id="entry-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>Ввод — ${cat}</h3><button class="close-btn" id="entry-modal-close">✕</button></div>
+        <div class="modal-body">
+          ${prevE?`<div class="alert alert-warn">Остаток предыдущего дня: <b>${fmt(prevE.remaining)}</b></div>`:''}
+          <div class="form-grid">
+            <div class="form-group"><label>Закуп ₸</label><input class="form-control" type="number" id="m-received" value="${m.received||''}" placeholder="0"/></div>
+            <div class="form-group"><label>Продажа ₸</label><input class="form-control" type="number" id="m-sold" value="${m.sold||''}" placeholder="0"/></div>
+            <div class="form-group"><label>Остаток ₸</label><input class="form-control" type="number" id="m-remaining" value="${m.remaining||''}" placeholder="0"/><span id="m-calc-hint" style="font-size:10px;color:var(--text3);"></span></div>
+            <div class="form-group"><label>Примечание</label><input class="form-control" id="m-note" value="${m.note||''}" placeholder="Необязательно"/></div>
+          </div>
+          <div id="m-warn"></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="entry-modal-close2">Отмена</button>
+          <button class="btn btn-primary" id="entry-save-btn">${entryState.saving?'Сохранение...':'Сохранить'}</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── EXPENSES ────────────────────────────────────────────────────────────────
+// expState.pointId — выбранная точка; expState.tab — expenses|salaries
+let expState = {tab:'expenses', pointId:'', modal:null, salModal:null, manageCats:false, editModal:null, editSalModal:null, filterDate:'', filterType:''};
+
+function renderExpenses(accessPoints){
+  // Init selected point — operator auto-gets their own point
+  if(!expState.pointId){
+    expState.pointId = STATE.user.role==='operator' ? (STATE.user.point_id||accessPoints[0]?.id||'') : (accessPoints[0]?.id||'');
+  }
+  if(!accessPoints.find(p=>p.id===expState.pointId)) expState.pointId = accessPoints[0]?.id||'';
+
+  // Filter by selected point
+  const selPoint = expState.pointId;
+  const visExp = STATE.expenses.filter(e=>{
+    if(e.point_id!==selPoint) return false;
+    if(expState.filterDate && !e.date?.startsWith(expState.filterDate)) return false;
+    if(expState.filterType && e.type!==expState.filterType) return false;
+    return true;
+  });
+  const visSal = STATE.salaries.filter(s=>s.point_id===selPoint);
+  const totExp = visExp.reduce((s,e)=>s+Number(e.amount||0),0);
+  const totSal = visSal.reduce((s,e)=>s+Number(e.amount||0),0);
+
+  // Point summary cards (all points)
+  const allPtCards = accessPoints.map(p=>{
+    const pExp = STATE.expenses.filter(e=>e.point_id===p.id).reduce((s,e)=>s+Number(e.amount||0),0);
+    const pSal = STATE.salaries.filter(s=>s.point_id===p.id).reduce((s,e)=>s+Number(e.amount||0),0);
+    const isActive = p.id===selPoint;
+    return `<div class="stat-card" style="cursor:pointer;border-color:${isActive?'var(--accent)':'var(--border)'};" data-exp-point="${p.id}">
+      <div class="stat-label">${p.name}</div>
+      <div class="stat-value r" style="font-size:15px;">${fmt(pExp+pSal)}</div>
+      <div class="stat-sub">Расх: ${fmt(pExp)} · Зарп: ${fmt(pSal)}</div>
+    </div>`;
+  }).join('');
+
+  const expRows = visExp.map(e=>`<tr>
+    <td data-label="Дата">${fmtDate(e.date)}</td>
+    <td data-label="Тип">${e.type}</td>
+    <td data-label="Сумма" class="num" style="color:var(--accent2);font-weight:500;">${fmt(e.amount)}</td>
+    <td data-label="Описание" style="color:var(--text3);">${e.description||'—'}</td>
+    <td style="display:flex;gap:4px;">
+      <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-edit-exp='${JSON.stringify({id:e.id,date:e.date,type:e.type,amount:e.amount,description:e.description})}'>✏️</button>
+      ${STATE.user.role==='admin'?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-exp="${e.id}">✕</button>`:''}
+    </td>
+  </tr>`).join('');
+
+  const salRows = visSal.map(s=>`<tr>
+    <td data-label="Период">${(()=>{const p=s.period||"";const[y,m]=p.split("-");return m&&y?m+"."+y:p;})()}</td>
+    <td data-label="Сотрудник">${s.employee}</td>
+    <td data-label="Сумма" class="num" style="color:var(--accent2);font-weight:500;">${fmt(s.amount)}</td>
+    <td style="display:flex;gap:4px;">
+      <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-edit-sal='${JSON.stringify({id:s.id,period:s.period,employee:s.employee,amount:s.amount})}'>✏️</button>
+      ${STATE.user.role==='admin'?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-sal="${s.id}">✕</button>`:''}
+    </td>
+  </tr>`).join('');
+
+  const expModal = expState.modal ? `
+    <div class="modal-overlay" id="exp-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>Новый расход — ${POINTS.find(p=>p.id===selPoint)?.name}</h3><button class="close-btn" id="exp-modal-close">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="exp-date" value="${today()}"/></div>
+            <div class="form-group"><label>Тип</label><select class="form-control" id="exp-type">${getExpTypes().map(t=>`<option>${t}</option>`).join('')}</select></div>
+            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="exp-amount" placeholder="0"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Описание</label><input class="form-control" id="exp-desc" placeholder="Необязательно"/></div>
+          </div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" id="exp-modal-close2">Отмена</button><button class="btn btn-primary" id="exp-save-btn">Сохранить</button></div>
+      </div>
+    </div>` : '';
+
+  const salModal = expState.salModal ? `
+    <div class="modal-overlay" id="sal-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>Зарплата — ${POINTS.find(p=>p.id===selPoint)?.name}</h3><button class="close-btn" id="sal-modal-close">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Период</label><input type="month" class="form-control" id="sal-period" value="${today().slice(0,7)}"/></div>
+            <div class="form-group"><label>Сотрудник</label><input class="form-control" id="sal-employee" placeholder="ФИО"/></div>
+            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="sal-amount" placeholder="0"/></div>
+          </div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" id="sal-modal-close">Отмена</button><button class="btn btn-primary" id="sal-save-btn">Сохранить</button></div>
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="section-title">Выберите точку</div>
+    <div class="stats-grid" style="margin-bottom:20px;">${allPtCards}</div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+      <div style="font-family:'Unbounded',sans-serif;font-size:12px;font-weight:600;color:var(--accent);">
+        📍 ${POINTS.find(p=>p.id===selPoint)?.name}
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div class="stat-card" style="padding:10px 16px;display:inline-flex;gap:16px;align-items:center;">
+          <span style="font-size:11px;color:var(--text3);">Расходы: <b style="color:var(--accent2);">${fmt(totExp)}</b></span>
+          <span style="font-size:11px;color:var(--text3);">Зарплаты: <b style="color:var(--accent2);">${fmt(totSal)}</b></span>
+          <span style="font-size:11px;color:var(--text3);">Итого: <b style="color:var(--accent);">${fmt(totExp+totSal)}</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-card" style="padding:14px;margin-bottom:14px;">
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="margin:0;">
+          <label>📅 Фильтр по месяцу</label>
+          <input type="month" class="form-control" value="${expState.filterDate}" style="width:160px;"
+            onchange="expState.filterDate=this.value;render();"/>
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label>🏷️ Фильтр по типу</label>
+          <select class="form-control" style="width:180px;"
+            onchange="expState.filterType=this.value;render();">
+            <option value="">Все категории</option>
+            ${getExpTypes().map(t=>`<option value="${t}" ${t===expState.filterType?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        ${expState.filterDate||expState.filterType?`
+        <button class="btn btn-danger" onclick="expState.filterDate='';expState.filterType='';render();" style="margin-top:18px;">
+          ✕ Сбросить фильтр
+        </button>
+        <span style="font-size:12px;color:var(--accent);margin-top:22px;">Показано: ${visExp.length} записей</span>
+        `:''}
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+      <div class="tabs" style="margin:0;">
+        <div class="tab ${expState.tab==='expenses'?'active':''}" data-exp-tab="expenses">💸 Расходы (${visExp.length})</div>
+        <div class="tab ${expState.tab==='salaries'?'active':''}" data-exp-tab="salaries">👤 Зарплаты (${visSal.length})</div>
+      </div>
+      <button class="btn btn-ghost" id="manage-cats-btn" style="font-size:11px;padding:6px 12px;">⚙️ Категории расходов</button>
+    </div>
+
+    ${expState.manageCats ? `
+    <div class="table-card" style="margin-bottom:16px;border-color:var(--accent);">
+      <div class="table-head"><h3>⚙️ Категории расходов</h3><button class="close-btn" id="close-cats-btn">✕</button></div>
+      <div style="padding:16px;">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+          ${getExpTypes().map((t,i)=>`
+            <div style="display:flex;align-items:center;gap:4px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:4px 10px;">
+              <span style="font-size:13px;">${t}</span>
+              <button data-del-cat="${i}" style="background:none;border:none;cursor:pointer;color:var(--accent2);font-size:14px;line-height:1;padding:0 2px;">×</button>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input class="form-control" id="new-cat-input" placeholder="Новая категория..." style="flex:1;max-width:260px;"/>
+          <button class="btn btn-primary" id="add-cat-btn">+ Добавить</button>
+        </div>
+      </div>
+    </div>` : ''}
+
+    ${expState.tab==='expenses'?`
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="btn btn-primary" id="add-exp-btn">+ Добавить расход</button>
+    </div>
+    <div class="table-card"><div class="table-scroll"><table>
+      <thead><tr><th style="min-width:100px;">Дата</th><th style="min-width:130px;">Тип</th><th class="num">Сумма</th><th>Описание</th><th></th></tr></thead>
+      <tbody>${expRows||'<tr><td colspan="5"><div class="empty">Нет расходов для этой точки</div></td></tr>'}</tbody>
+    </table></div>`:`
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+      <button class="btn btn-primary" id="add-sal-btn">+ Добавить зарплату</button>
+    </div>
+    <div class="table-card"><div class="table-scroll"><table>
+      <thead><tr><th style="min-width:100px;">Период</th><th>Сотрудник</th><th class="num">Сумма</th><th></th></tr></thead>
+      <tbody>${salRows||'<tr><td colspan="4"><div class="empty">Нет зарплат для этой точки</div></td></tr>'}</tbody>
+    </table></div>`}
+    ${expModal}${salModal}
+
+    ${expState.editModal ? `
+    <div class="modal-overlay" id="edit-exp-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>✏️ Редактировать расход</h3><button class="close-btn" id="edit-exp-close">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="edit-exp-date" value="${expState.editModal.date}"/></div>
+            <div class="form-group"><label>Тип</label><select class="form-control" id="edit-exp-type">${getExpTypes().map(t=>`<option${t===expState.editModal.type?' selected':''}>${t}</option>`).join('')}</select></div>
+            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="edit-exp-amount" value="${expState.editModal.amount}"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Описание</label><input class="form-control" id="edit-exp-desc" value="${expState.editModal.description||''}"/></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="edit-exp-close2">Отмена</button>
+          <button class="btn btn-primary" id="edit-exp-save">Сохранить</button>
+        </div>
+      </div>
+    </div>` : ''}
+
+    ${expState.editSalModal ? `
+    <div class="modal-overlay" id="edit-sal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>✏️ Редактировать зарплату</h3><button class="close-btn" id="edit-sal-close">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Период</label><input type="month" class="form-control" id="edit-sal-period" value="${expState.editSalModal.period}"/></div>
+            <div class="form-group"><label>Сотрудник</label><input class="form-control" id="edit-sal-employee" value="${expState.editSalModal.employee}"/></div>
+            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="edit-sal-amount" value="${expState.editSalModal.amount}"/></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="edit-sal-close">Отмена</button>
+          <button class="btn btn-primary" id="edit-sal-save">Сохранить</button>
+        </div>
+      </div>
+    </div>` : ''}
+  `;
+}
+
+// ─── BANK ────────────────────────────────────────────────────────────────────
+function renderBank(){
+  const bk = STATE.bankTx;
+  const totC = bk.reduce((s,t)=>s+Number(t.credit||0),0);
+  const totD = bk.reduce((s,t)=>s+Number(t.debit||0),0);
+  const rows = bk.map(t=>`<tr>
+    <td data-label="№" style="font-size:11px;color:var(--text3);">${t.doc_no||'—'}</td>
+    <td data-label="Дата" style="font-size:12px;white-space:nowrap;">${fmtDate(t.date)}</td>
+    <td data-label="Дебет" class="num" style="color:var(--accent2);font-weight:500;">${Number(t.debit)>0?fmt(t.debit):'—'}</td>
+    <td data-label="Кредит" class="num" style="color:var(--accent3);font-weight:500;">${Number(t.credit)>0?fmt(t.credit):'—'}</td>
+    <td style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.counterpart||''}">${t.counterpart||t.description||'—'}</td>
+    <td style="font-size:11px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.purpose||''}">${t.purpose||'—'}</td>
+    <td style="color:var(--text3);font-size:10px;">${t.source_file||''}</td>
+    <td>${t.approved?'<span class="badge badge-g">✓ Принято</span>':'<span class="badge badge-y">Ожидает</span>'}</td>
+    <td style="display:flex;gap:4px;">
+      ${!t.approved&&STATE.user.role==='admin'?`<button class="btn btn-success" style="padding:2px 7px;font-size:10px;" data-approve-tx="${t.id}">✓</button>`:''}
+      ${STATE.user.role==='admin'?`<button class="btn btn-danger" style="padding:2px 7px;font-size:10px;" data-del-tx="${t.id}">✕</button>`:''}
+    </td>
+  </tr>`).join('');
+  return `
+    <div class="stats-grid" style="margin-bottom:18px;">
+      <div class="stat-card"><div class="stat-label">Всего приходов</div><div class="stat-value g">${fmt(totC)}</div></div>
+      <div class="stat-card"><div class="stat-label">Всего расходов</div><div class="stat-value r">${fmt(totD)}</div></div>
+      <div class="stat-card"><div class="stat-label">Транзакций</div><div class="stat-value b">${bk.length}</div></div>
+    </div>
+    <div class="section-title">Загрузить выписку</div>
+    <div style="background:var(--card);border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;margin-bottom:18px;">
+      <div style="font-size:28px;margin-bottom:8px;">📂</div>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:6px;">Загрузите Excel-файл банковской выписки</p>
+      <p style="color:var(--text3);font-size:11px;margin-bottom:14px;">Формат: Дата | Описание | Приход | Расход</p>
+      <label class="btn btn-primary" style="cursor:pointer;">📤 Выбрать файл Excel<input type="file" id="bank-file-input" accept=".xlsx,.xls" style="display:none;"/></label>
+    </div>
+    <div class="table-card"><div class="table-head"><h3>Банковские операции</h3></div>
+    <div class="table-scroll"><table><thead><tr><th style="min-width:80px;">№ Док.</th><th>Дата</th><th class="num">Дебет</th><th class="num">Кредит</th><th>Контрагент</th><th>Назначение</th><th>Файл</th><th>Статус</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="7"><div class="empty">Нет операций</div></td></tr>'}</tbody></table></div></div>
+  `;
+}
+
+// ─── REPORT ──────────────────────────────────────────────────────────────────
+let reportState = {pointId:'', days:'15'};
+
+function renderReport(accessPoints){
+  const editable = accessPoints.filter(p=>p.id!=='ofis');
+  if(!reportState.pointId) reportState.pointId = 'ALL';
+  const dates = getLast(Number(reportState.days));
+  const isAll = reportState.pointId === 'ALL';
+
+  // Per-point summary for consolidated view
+  const pointSummary = editable.map(p=>{
+    const pCats = CATS[p.id]||[];
+    const pEntries = STATE.entries.filter(e=>e.point_id===p.id&&dates.includes(e.date));
+    const pS = pEntries.reduce((s,e)=>s+Number(e.sold||0),0);
+    const pR = pEntries.reduce((s,e)=>s+Number(e.received||0),0);
+    const pRem = pCats.map(cat=>{
+      const last = pEntries.filter(e=>e.category===cat).sort((a,b)=>b.date.localeCompare(a.date))[0];
+      return last?Number(last.remaining||0):0;
+    }).reduce((s,v)=>s+v,0);
+    const pExp = STATE.expenses.filter(e=>e.point_id===p.id&&dates.includes(e.date)).reduce((s,e)=>s+Number(e.amount||0),0);
+    const pSal = STATE.salaries.filter(s=>s.point_id===p.id).reduce((s,e)=>s+Number(e.amount||0),0);
+    const pCosts = pExp+pSal;
+    const pProfit = pS-pR-pCosts+pRem;
+    const pMargin = pS>0?((pProfit/pS)*100).toFixed(1):'0.0';
+    return {p, pS, pR, pRem, pCosts, pExp, pSal, pProfit, pMargin};
+  });
+
+  // Category data — for single point or all points merged
+  const activePts = isAll ? editable : editable.filter(p=>p.id===reportState.pointId);
+  const allCats = [...new Set(activePts.flatMap(p=>CATS[p.id]||[]))];
+  const cats = isAll ? allCats : (CATS[reportState.pointId]||[]);
+
+  const catData = cats.map(cat=>{
+    const ce = STATE.entries.filter(e=>activePts.some(p=>p.id===e.point_id)&&e.category===cat&&dates.includes(e.date));
+    const totR = ce.reduce((s,e)=>s+Number(e.received||0),0);
+    const totS = ce.reduce((s,e)=>s+Number(e.sold||0),0);
+    const lastRem = activePts.reduce((sum,p)=>{
+      const last = ce.filter(e=>e.point_id===p.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
+      return sum+(last?Number(last.remaining||0):0);
+    },0);
+    return {cat, totR, totS, lastRem, count:ce.length};
+  });
+
+  const totSold   = catData.reduce((s,c)=>s+c.totS,0);
+  const totBought = catData.reduce((s,c)=>s+c.totR,0);
+  const totRem    = catData.reduce((s,c)=>s+c.lastRem,0);
+  const ptExp = isAll
+    ? STATE.expenses.filter(e=>dates.includes(e.date)&&editable.some(p=>p.id===e.point_id))
+    : STATE.expenses.filter(e=>e.point_id===reportState.pointId&&dates.includes(e.date));
+  const ptSal = isAll
+    ? STATE.salaries.filter(s=>editable.some(p=>p.id===s.point_id))
+    : STATE.salaries.filter(s=>s.point_id===reportState.pointId);
+  const totExp = ptExp.reduce((s,e)=>s+Number(e.amount||0),0);
+  const totSal = ptSal.reduce((s,e)=>s+Number(e.amount||0),0);
+  const totCosts = totExp+totSal;
+  const profit = totSold-totBought-totCosts+totRem;
+  const marginPct = totSold>0 ? ((profit/totSold)*100).toFixed(1) : '0.0';
+  const costPct   = totSold>0 ? (((totBought+totCosts)/totSold)*100).toFixed(1) : '0.0';
+
+  const tabs = [
+    `<div class="tab ${isAll?'active':''}" data-report-point="ALL">🌐 Все точки</div>`,
+    ...editable.map(p=>`<div class="tab ${reportState.pointId===p.id&&!isAll?'active':''}" data-report-point="${p.id}">${p.name}</div>`)
+  ].join('');
+
+  // Consolidated point-by-point table (only shown for ALL)
+  const consolidatedRows = isAll ? pointSummary.map(({p,pS,pR,pRem,pCosts,pProfit,pMargin})=>`
+    <tr>
+      <td><span class="badge badge-y">${p.name}</span></td>
+      <td style="color:#60a5fa;font-weight:500;">${fmt(pR)}</td>
+      <td style="color:var(--accent);font-weight:500;">${fmt(pS)}</td>
+      <td style="color:var(--accent3);">${fmt(pRem)}</td>
+      <td style="color:var(--accent2);">${fmt(pCosts)}</td>
+      <td style="color:${Number(pProfit)>=0?'var(--accent3)':'var(--accent2)'};font-weight:700;">${fmt(pProfit)}</td>
+      <td style="color:${Number(pMargin)>=0?'var(--accent3)':'var(--accent2)'};font-weight:700;">${pMargin}%</td>
+    </tr>`).join('') : '';
+
+  const consolidatedSection = isAll ? `
+    <div class="section-title">Сводная таблица по точкам</div>
+    <div class="table-card" style="margin-bottom:20px;">
+      <div class="table-head"><h3>📍 Все точки — сравнение</h3></div>
+      <table>
+        <thead><tr>
+  <th>Точка</th>
+  <th class="num">Закуп</th>
+  <th class="num">Продажа</th>
+  <th class="num">Остаток</th>
+  <th class="num">Расходы</th>
+  <th class="num">Прибыль</th>
+  <th class="num">Рент-сть</th>
+</tr></thead>
+        <tbody>
+          ${consolidatedRows}
+          <tr style="background:var(--bg3);font-weight:700;border-top:2px solid var(--accent);">
+            <td>ИТОГО ВСЕ</td>
+            <td style="color:#60a5fa;">${fmt(totBought)}</td>
+            <td style="color:var(--accent);">${fmt(totSold)}</td>
+            <td style="color:var(--accent3);">${fmt(totRem)}</td>
+            <td style="color:var(--accent2);">${fmt(totCosts)}</td>
+            <td style="color:${profit>=0?'var(--accent3)':'var(--accent2)'};">${fmt(profit)}</td>
+            <td style="color:${profit>=0?'var(--accent3)':'var(--accent2)'};">${marginPct}%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-card" style="margin-bottom:20px;">
+      <div class="table-head"><h3>📊 Продажи по точкам</h3></div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+        ${pointSummary.sort((a,b)=>b.pS-a.pS).map(({p,pS})=>{
+          const maxS=Math.max(...pointSummary.map(x=>x.pS),1);
+          const pct=totSold>0?((pS/totSold)*100).toFixed(1):'0';
+          return `<div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:110px;font-size:12px;color:var(--text);flex-shrink:0;">${p.name}</div>
+            <div style="flex:1;height:12px;background:var(--bg3);border-radius:6px;overflow:hidden;">
+              <div style="height:100%;width:${(pS/maxS)*100}%;background:var(--accent);border-radius:6px;"></div>
+            </div>
+            <div style="width:45px;text-align:right;font-size:11px;color:var(--accent);font-weight:600;">${pct}%</div>
+            <div style="width:110px;text-align:right;font-size:12px;color:var(--text2);">${fmt(pS)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="table-card" style="margin-bottom:20px;">
+      <div class="table-head"><h3>💹 Прибыль по точкам</h3></div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+        ${pointSummary.sort((a,b)=>b.pProfit-a.pProfit).map(({p,pProfit,pMargin})=>{
+          const maxP=Math.max(...pointSummary.map(x=>Math.abs(x.pProfit)),1);
+          const isPos=pProfit>=0;
+          return `<div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:110px;font-size:12px;color:var(--text);flex-shrink:0;">${p.name}</div>
+            <div style="flex:1;height:12px;background:var(--bg3);border-radius:6px;overflow:hidden;">
+              <div style="height:100%;width:${(Math.abs(pProfit)/maxP)*100}%;background:${isPos?'var(--accent3)':'var(--accent2)'};border-radius:6px;"></div>
+            </div>
+            <div style="width:45px;text-align:right;font-size:11px;color:${isPos?'var(--accent3)':'var(--accent2)'};font-weight:600;">${pMargin}%</div>
+            <div style="width:110px;text-align:right;font-size:12px;color:${isPos?'var(--accent3)':'var(--accent2)'};">${fmt(pProfit)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  const catRows = catData.map(c=>`<tr>
+    <td><b>${c.cat}</b></td>
+    <td style="color:#60a5fa;">${fmt(c.totR)}</td>
+    <td style="color:var(--accent);">${fmt(c.totS)}</td>
+    <td style="color:var(--accent3);">${fmt(c.lastRem)}</td>
+    <td><span class="badge badge-b">${c.count}</span></td>
+  </tr>`).join('');
+
+  const expRows = [
+    ...ptExp.map(e=>`<tr><td>${fmtDate(e.date)}</td><td><span class="badge badge-r">${e.type}</span></td><td style="color:var(--accent2);">${fmt(e.amount)}</td><td style="color:var(--text3);">${e.description||'—'}</td></tr>`),
+    ...ptSal.map(s=>`<tr><td data-label="Период">${(()=>{const p=s.period||"";const[y,m]=p.split("-");return m&&y?m+"."+y:p;})()}</td><td><span class="badge badge-r">Зарплата</span></td><td style="color:var(--accent2);">${fmt(s.amount)}</td><td style="color:var(--text3);">${s.employee}</td></tr>`),
+  ].join('');
+
+  // Store for export buttons
+  window._lastReportData = {catData,totSold,totBought,totRem,totExp,totSal,totCosts,profit,dates,
+    pointId:reportState.pointId,
+    pointSummary:pointSummary.map(x=>({name:x.p.name,pS:x.pS,pR:x.pR,pRem:x.pRem,pCosts:x.pCosts,pProfit:x.pProfit,pMargin:x.pMargin}))
+  };
+
+  return `
+    <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
+      <div class="form-group" style="margin:0;"><label>Период</label>
+        <select class="form-control" id="report-days" style="width:130px;">
+          <option value="7" ${reportState.days==='7'?'selected':''}>7 дней</option>
+          <option value="10" ${reportState.days==='10'?'selected':''}>10 дней</option>
+          <option value="15" ${reportState.days==='15'?'selected':''}>15 дней</option>
+          <option value="30" ${reportState.days==='30'?'selected':''}>30 дней</option>
+        </select>
+      </div>
+      <button class="btn btn-success" id="export-excel-btn">📥 Excel</button>
+      <button class="btn btn-ghost" id="export-pdf-btn">🖨️ PDF</button>
+    </div>
+    <div class="tabs">${tabs}</div>
+    ${consolidatedSection}
+    <div class="profit-box">
+      <div class="profit-label">ПРИБЫЛЬ = Продажа − Закуп − Расходы + Остаток</div>
+      <div class="profit-value" style="color:${profit>=0?'var(--accent3)':'var(--accent2)'};">${fmt(profit)}</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:10px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:28px;font-family:'Unbounded',sans-serif;font-weight:700;color:${profit>=0?'var(--accent3)':'var(--accent2)'};">${marginPct}%</span>
+          <span style="font-size:11px;color:var(--text2);">Рентабельность<br>(прибыль / продажа)</span>
+        </div>
+        <div style="width:1px;height:40px;background:var(--border);"></div>
+        <div style="font-size:11px;color:var(--text2);text-align:left;line-height:1.8;">
+          <div>📦 Себестоимость: <b style="color:var(--accent2);">${costPct}%</b> от продаж</div>
+          <div>📅 Период: ${fmtDate(dates[0])} — ${fmtDate(dates[dates.length-1])}</div>
+        </div>
+      </div>
+    </div>
+    <div class="stats-grid" style="margin-bottom:18px;">
+      <div class="stat-card"><div class="stat-label">Продажа</div><div class="stat-value y">${fmt(totSold)}</div></div>
+      <div class="stat-card"><div class="stat-label">Закуп</div><div class="stat-value b">${fmt(totBought)}</div></div>
+      <div class="stat-card"><div class="stat-label">Остаток</div><div class="stat-value g">${fmt(totRem)}</div></div>
+      <div class="stat-card"><div class="stat-label">Расходы</div><div class="stat-value r">${fmt(totCosts)}</div></div>
+    </div>
+    <div class="section-title">По категориям</div>
+
+    <div class="table-card" style="margin-bottom:16px;">
+      <div class="table-head"><h3>📊 Продажи по категориям</h3></div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+        ${catData.filter(c=>c.totS>0).sort((a,b)=>b.totS-a.totS).map(c=>{
+          const pct = totSold>0?((c.totS/totSold)*100).toFixed(1):'0';
+          const bar = totSold>0?((c.totS/totSold)*100):0;
+          return `<div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:90px;font-size:12px;color:var(--text);flex-shrink:0;">${c.cat}</div>
+            <div style="flex:1;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;">
+              <div style="height:100%;width:${bar}%;background:var(--accent);border-radius:5px;transition:width .6s;"></div>
+            </div>
+            <div style="width:55px;text-align:right;font-size:11px;color:var(--accent);font-weight:600;">${pct}%</div>
+            <div style="width:100px;text-align:right;font-size:11px;color:var(--text2);">${fmt(c.totS)}</div>
+          </div>`;
+        }).join('')||'<div class="empty">Нет данных о продажах</div>'}
+      </div>
+    </div>
+
+    <div class="table-card" style="margin-bottom:16px;">
+      <div class="table-head"><h3>📦 Закуп по категориям</h3></div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:10px;">
+        ${catData.filter(c=>c.totR>0).sort((a,b)=>b.totR-a.totR).map(c=>{
+          const pct = totBought>0?((c.totR/totBought)*100).toFixed(1):'0';
+          const bar = totBought>0?((c.totR/totBought)*100):0;
+          return `<div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:90px;font-size:12px;color:var(--text);flex-shrink:0;">${c.cat}</div>
+            <div style="flex:1;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;">
+              <div style="height:100%;width:${bar}%;background:#60a5fa;border-radius:5px;transition:width .6s;"></div>
+            </div>
+            <div style="width:55px;text-align:right;font-size:11px;color:#60a5fa;font-weight:600;">${pct}%</div>
+            <div style="width:100px;text-align:right;font-size:11px;color:var(--text2);">${fmt(c.totR)}</div>
+          </div>`;
+        }).join('')||'<div class="empty">Нет данных о закупе</div>'}
+      </div>
+    </div>
+
+    <div class="table-card"><div class="table-scroll"><table>
+      <thead><tr><th style="min-width:140px;">Категория</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th class="num">Дней</th><th class="num">Рент-сть</th></tr></thead>
+      <tbody>
+        ${catData.map(c=>{
+          const cm = c.totS>0?(((c.totS-c.totR)/c.totS)*100).toFixed(1):'—';
+          return `<tr>
+            <td><b>${c.cat}</b></td>
+            <td class="num" style="color:#60a5fa;">${fmt(c.totR)}</td>
+            <td class="num" style="color:var(--accent);">${fmt(c.totS)}</td>
+            <td class="num" style="color:var(--accent3);">${fmt(c.lastRem)}</td>
+            <td class="num"><span class="badge badge-b">${c.count}</span></td>
+            <td class="num" style="color:${Number(cm)>=0?'var(--accent3)':'var(--accent2)'};font-weight:600;">${cm!=='—'?cm+'%':'—'}</td>
+          </tr>`;
+        }).join('')||'<tr><td colspan="6"><div class="empty">Нет данных</div></td></tr>'}
+        <tr style="background:var(--bg3);font-weight:600;">
+          <td>ИТОГО</td>
+          <td class="num" style="color:#60a5fa;">${fmt(totBought)}</td>
+          <td class="num" style="color:var(--accent);">${fmt(totSold)}</td>
+          <td class="num" style="color:var(--accent3);">${fmt(totRem)}</td>
+          <td class="num">—</td>
+          <td class="num" style="color:${profit>=0?'var(--accent3)':'var(--accent2)'};">${marginPct}%</td>
+        </tr>
+      </tbody>
+    </table></div></div>
+    <div class="section-title">Расходы за период</div>
+    <div class="table-card"><div class="table-scroll"><table>
+      <thead><tr><th>Дата/Период</th><th>Тип</th><th>Сумма</th><th>Описание</th></tr></thead>
+      <tbody>${expRows||'<tr><td colspan="4"><div class="empty">Нет расходов</div></td></tr>'}</tbody>
+    </table></div></div></div></div>
+
+  `;
+}
+
+function exportExcel(d){
+  const isAll = d.pointId==='ALL';
+  const pt = isAll ? 'Все точки' : (POINTS.find(p=>p.id===d.pointId)?.name||d.pointId);
+  const rows = [
+    ['ISTANBUL ET MARKET — Отчёт',pt,'Период',`${d.dates[0]} — ${d.dates[d.dates.length-1]}`],[],
+  ];
+  if(isAll && d.pointSummary){
+    rows.push(['СВОДКА ПО ТОЧКАМ']);
+    rows.push(['Точка','Закуп','Продажа','Остаток','Расходы','Прибыль','Рент-сть %']);
+    d.pointSummary.forEach(p=>rows.push([p.name,p.pR,p.pS,p.pRem,p.pCosts,p.pProfit,p.pMargin+'%']));
+    rows.push([]);
+  }
+  rows.push(['КАТЕГОРИИ']);
+  rows.push(['Категория','Закуп','Продажа','Остаток','Дней','Рентабельность %']);
+  d.catData.forEach(c=>rows.push([c.cat,c.totR,c.totS,c.lastRem,c.count,c.totS>0?(((c.totS-c.totR)/c.totS)*100).toFixed(1)+'%':'—']));
+  rows.push([]);
+  rows.push(['Итого Продажа',d.totSold],['Итого Закуп',d.totBought],['Итого Остаток',d.totRem],
+    ['Операц. расходы',d.totExp],['Зарплаты',d.totSal],['Итого расходы',d.totCosts]);
+  rows.push([],['ПРИБЫЛЬ',d.profit],['Рентабельность %',d.totSold>0?((d.profit/d.totSold)*100).toFixed(1)+'%':'0%']);
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Отчёт');
+  XLSX.writeFile(wb,`Otchet_${d.pointId}_${d.dates[0]}.xlsx`);
+}
+
+function exportPDF(d){
+  const isAll = d.pointId==='ALL';
+  const pt = isAll ? 'Все точки' : (POINTS.find(p=>p.id===d.pointId)?.name||d.pointId);
+  const marginPct = d.totSold>0?((d.profit/d.totSold)*100).toFixed(1):'0.0';
+  const w = window.open('','_blank');
+  const ptRows = (isAll && d.pointSummary) ? d.pointSummary.map(p=>`<tr><td>${p.name}</td><td>${p.pR.toLocaleString()}</td><td>${p.pS.toLocaleString()}</td><td>${p.pRem.toLocaleString()}</td><td>${p.pCosts.toLocaleString()}</td><td style="color:${Number(p.pProfit)>=0?'green':'red'}">${p.pProfit.toLocaleString()}</td><td>${p.pMargin}%</td></tr>`).join('') : '';
+  const rows = d.catData.map(c=>`<tr><td>${c.cat}</td><td>${c.totR.toLocaleString()}</td><td>${c.totS.toLocaleString()}</td><td>${c.lastRem.toLocaleString()}</td><td>${c.totS>0?(((c.totS-c.totR)/c.totS)*100).toFixed(1)+'%':'—'}</td></tr>`).join('');
+  w.document.write(`<html><head><meta charset="UTF-8"/><title>Отчёт</title><style>
+    body{font-family:Arial,sans-serif;padding:24px;color:#111;font-size:12px;}
+    h1{color:#b45309;font-size:15px;margin:0 0 2px;}
+    h2{font-size:11px;color:#666;margin:0 0 16px;}
+    h3{font-size:11px;font-weight:700;margin:14px 0 6px;color:#333;border-bottom:1px solid #eee;padding-bottom:4px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:14px;}
+    th,td{border:1px solid #e0e0e0;padding:6px 9px;text-align:left;}
+    th{background:#fef3c7;font-weight:600;font-size:11px;}
+    .profit{color:${d.profit>=0?'#059669':'#dc2626'};font-weight:bold;}
+    .margin{color:${d.profit>=0?'#059669':'#dc2626'};font-weight:bold;}
+    .tot{background:#fefce8;font-weight:700;}
+  </style></head><body>
+  <h1>ISTANBUL ET MARKET</h1>
+  <h2>Отчёт: ${pt} &nbsp;·&nbsp; ${d.dates[0]} — ${d.dates[d.dates.length-1]}</h2>
+  ${isAll && ptRows ? `<h3>Сводка по точкам</h3>
+  <table><thead><tr><th>Точка</th><th>Закуп ₸</th><th>Продажа ₸</th><th>Остаток ₸</th><th>Расходы ₸</th><th>Прибыль ₸</th><th>Рент-сть</th></tr></thead>
+  <tbody>${ptRows}</tbody></table>` : ''}
+  <h3>По категориям</h3>
+  <table><thead><tr><th>Категория</th><th>Закуп ₸</th><th>Продажа ₸</th><th>Остаток ₸</th><th>Рент-сть</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  <h3>Итоги</h3>
+  <table style="max-width:380px;">
+    <tr><th>Продажа</th><td>${d.totSold.toLocaleString()} ₸</td></tr>
+    <tr><th>Закуп</th><td>${d.totBought.toLocaleString()} ₸</td></tr>
+    <tr><th>Остаток</th><td>${d.totRem.toLocaleString()} ₸</td></tr>
+    <tr><th>Расходы</th><td>${d.totCosts.toLocaleString()} ₸</td></tr>
+    <tr class="tot"><th>ПРИБЫЛЬ</th><td class="profit">${d.profit.toLocaleString()} ₸</td></tr>
+    <tr class="tot"><th>Рентабельность</th><td class="margin">${marginPct}%</td></tr>
+  </table>
+  <script>window.print();<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+// ─── USERS ───────────────────────────────────────────────────────────────────
+let usersData = [];
+let usersLoaded = false;
+let userModal = false;
+let passModal = null;
+
+// ─── STAFF STATE ──────────────────────────────────────────────────────────────
+let staffData = [];
+let staffLoaded = false;
+let staffModal = null;   // new employee modal
+let advanceModal = null; // {employeeId, name}
+let salPayModal = null;  // salary payment modal // {userId, name}
+
+function renderUsers(){
+  if(!usersLoaded){
+    sb.from('users').select('*').order('created_at').then(({data})=>{usersData=data||[];usersLoaded=true;render();});
+    return '<div class="loading-screen" style="min-height:200px;"><div class="spinner"></div></div>';
+  }
+  const rows = usersData.map(u=>`<tr>
+    <td>${u.name}</td>
+    <td><code style="font-size:11px;background:var(--bg3);padding:2px 6px;border-radius:4px;">${u.login}</code></td>
+    <td><span class="badge ${u.role==='admin'?'badge-y':'badge-b'}">${u.role==='admin'?'Администратор':'Оператор'}</span></td>
+    <td>${u.point_id?POINTS.find(p=>p.id===u.point_id)?.name||u.point_id:'<span style="color:var(--text3)">Все точки</span>'}</td>
+    <td style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-pass-user="${u.id}" data-pass-name="${u.name}">🔑 Şifre</button>
+      ${u.id!==STATE.user.id?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-user="${u.id}">✕</button>`:''}
+    </td>
+  </tr>`).join('');
+
+  const modal = userModal ? `
+    <div class="modal-overlay" id="user-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>Новый пользователь</h3><button class="close-btn" id="user-modal-close">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Имя</label><input class="form-control" id="u-name" placeholder="ФИО"/></div>
+            <div class="form-group"><label>Логин</label><input class="form-control" id="u-login" placeholder="login"/></div>
+            <div class="form-group"><label>Пароль</label><input class="form-control" id="u-pass" placeholder="пароль"/></div>
+            <div class="form-group"><label>Роль</label><select class="form-control" id="u-role"><option value="operator">Оператор</option><option value="admin">Администратор</option></select></div>
+            <div class="form-group"><label>Точка</label><select class="form-control" id="u-point"><option value="">— все точки —</option>${POINTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select></div>
+          </div>
+        </div>
+        <div class="modal-foot"><button class="btn btn-ghost" id="user-modal-close2">Отмена</button><button class="btn btn-primary" id="user-save-btn">Создать</button></div>
+      </div>
+    </div>` : '';
+
+  const passModalHtml = passModal ? `
+    <div class="modal-overlay" id="pass-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>🔑 Изменить пароль — ${passModal.name}</h3><button class="close-btn" id="pass-modal-close">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Новый пароль</label><input class="form-control" type="password" id="new-pass" placeholder="Введите новый пароль"/></div>
+            <div class="form-group"><label>Повторите пароль</label><input class="form-control" type="password" id="new-pass2" placeholder="Повторите пароль"/></div>
+          </div>
+          <div id="pass-err"></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="pass-modal-close2">Отмена</button>
+          <button class="btn btn-primary" id="pass-save-btn">Сохранить</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  return `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;"><button class="btn btn-primary" id="add-user-btn">+ Добавить</button></div>
+    <div class="table-card"><div class="table-scroll"><table>
+      <thead><tr><th>Имя</th><th>Логин</th><th>Роль</th><th>Точка</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="5"><div class="empty">Нет пользователей</div></td></tr>'}</tbody>
+    </table></div></div>
+    ${modal}
+    ${passModalHtml}
+  `;
+}
+
+// ─── BIND EVENTS ─────────────────────────────────────────────────────────────
+function bindEvents(accessPoints){
+  // Hamburger menu
+  document.getElementById('hamburger-btn')?.addEventListener('click',()=>{
+    document.querySelector('.sidebar')?.classList.toggle('open');
+    document.getElementById('sidebar-overlay')?.classList.toggle('open');
+  });
+  document.getElementById('sidebar-overlay')?.addEventListener('click',()=>{
+    document.querySelector('.sidebar')?.classList.remove('open');
+    document.getElementById('sidebar-overlay')?.classList.remove('open');
+  });
+  // Close sidebar on nav click (mobile)
+  document.querySelectorAll('[data-page]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      document.querySelector('.sidebar')?.classList.remove('open');
+      document.getElementById('sidebar-overlay')?.classList.remove('open');
+    });
+  });
+
+  // Backup / Restore
+  document.getElementById('backup-btn')?.addEventListener('click', downloadBackup);
+  document.getElementById('restore-file')?.addEventListener('change', e=>{
+    const file = e.target.files[0];
+    if(file) restoreBackup(file);
+    e.target.value='';
+  });
+
+  // Theme
+  document.getElementById('theme-btn')?.addEventListener('click',()=>setState({theme:STATE.theme==='dark'?'light':'dark'}));
+  // Refresh
+  document.getElementById('refresh-btn')?.addEventListener('click',()=>loadAll());
+  // Logout
+  document.getElementById('logout-btn')?.addEventListener('click',doLogout);
+  // Nav
+  document.querySelectorAll('[data-page]').forEach(el=>{
+    el.addEventListener('click',()=>setState({page:el.dataset.page}));
+  });
+
+  // Entry page
+  document.querySelectorAll('[data-entry-point]').forEach(el=>{
+    el.addEventListener('click',()=>{entryState.pointId=el.dataset.entryPoint;render();});
+  });
+  document.getElementById('entry-date')?.addEventListener('change',e=>{entryState.date=e.target.value;render();});
+  document.querySelectorAll('[data-entry-cat]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const cat=el.dataset.entryCat;
+      const existing=STATE.entries.find(e=>e.point_id===entryState.pointId&&e.date===entryState.date&&e.category===cat);
+      entryState.modal={cat, existing, received:existing?.received||'', sold:existing?.sold||'', remaining:existing?.remaining||'', note:existing?.note||''};
+      render();
+    });
+  });
+  document.getElementById('entry-modal-close')?.addEventListener('click',()=>{entryState.modal=null;render();});
+  document.getElementById('entry-modal-close2')?.addEventListener('click',()=>{entryState.modal=null;render();});
+  document.getElementById('entry-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='entry-modal-overlay'){entryState.modal=null;render();}});
+  document.getElementById('entry-save-btn')?.addEventListener('click',async()=>{
+    const received=Number(document.getElementById('m-received').value)||0;
+    const sold=Number(document.getElementById('m-sold').value)||0;
+    const remaining=Number(document.getElementById('m-remaining').value)||0;
+    const note=document.getElementById('m-note').value;
+    const cat=entryState.modal.cat;
+    const btn=document.getElementById('entry-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const exists=STATE.entries.find(e=>e.point_id===entryState.pointId&&e.date===entryState.date&&e.category===cat);
+    let err;
+    if(exists){
+      const r=await sb.from('daily_entries').update({received,sold,remaining,note,updated_at:new Date().toISOString()}).eq('id',exists.id);
+      err=r.error;
+    } else {
+      const r=await sb.from('daily_entries').insert({point_id:entryState.pointId,date:entryState.date,category:cat,received,sold,remaining,note,user_id:STATE.user.id});
+      err=r.error;
+    }
+    if(err){showAlert('error','Ошибка: '+err.message);}
+    else{showAlert('success',`"${cat}" сохранено`);entryState.modal=null;}
+    await loadAll();
+  });
+
+  // Expenses
+  document.querySelectorAll('[data-exp-tab]').forEach(el=>{
+    el.addEventListener('click',()=>{expState.tab=el.dataset.expTab;render();});
+  });
+  // Expense filters
+  document.getElementById('filter-date')?.addEventListener('change',e=>{expState.filterDate=e.target.value;render();});
+  document.getElementById('filter-type')?.addEventListener('change',e=>{expState.filterType=e.target.value;render();});
+  document.getElementById('clear-filter-btn')?.addEventListener('click',()=>{expState.filterDate='';expState.filterType='';render();});
+
+  // Category management
+  document.getElementById('manage-cats-btn')?.addEventListener('click',()=>{expState.manageCats=!expState.manageCats;render();});
+  document.getElementById('close-cats-btn')?.addEventListener('click',()=>{expState.manageCats=false;render();});
+  document.getElementById('add-cat-btn')?.addEventListener('click',()=>{
+    const inp = document.getElementById('new-cat-input');
+    const val = inp.value.trim();
+    if(!val) return;
+    const types = getExpTypes();
+    if(types.includes(val)){showAlert('error','Такая категория уже есть');return;}
+    types.push(val);
+    saveExpTypes(types);
+    inp.value='';
+    render();
+    showAlert('success','Категория добавлена: '+val);
+  });
+  document.getElementById('new-cat-input')?.addEventListener('keydown',e=>{
+    if(e.key==='Enter') document.getElementById('add-cat-btn')?.click();
+  });
+  document.querySelectorAll('[data-del-cat]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const types = getExpTypes();
+      const idx = Number(el.dataset.delCat);
+      if(!confirm('Удалить категорию "'+types[idx]+'"?')) return;
+      types.splice(idx,1);
+      saveExpTypes(types);
+      render();
+    });
+  });
+
+  // Expenses — point selector cards
+  document.querySelectorAll('[data-exp-point]').forEach(el=>{
+    el.addEventListener('click',()=>{expState.pointId=el.dataset.expPoint;expState.modal=null;expState.salModal=null;render();});
+  });
+  document.getElementById('add-exp-btn')?.addEventListener('click',()=>{expState.modal={};render();});
+  document.getElementById('exp-modal-close')?.addEventListener('click',()=>{expState.modal=null;render();});
+  document.getElementById('exp-modal-close2')?.addEventListener('click',()=>{expState.modal=null;render();});
+  document.getElementById('exp-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='exp-modal-overlay'){expState.modal=null;render();}});
+  document.getElementById('exp-save-btn')?.addEventListener('click',async()=>{
+    const d={
+      date:document.getElementById('exp-date').value,
+      point_id:expState.pointId,
+      type:document.getElementById('exp-type').value,
+      amount:Number(document.getElementById('exp-amount').value)||0,
+      description:document.getElementById('exp-desc').value,
+      user_id:STATE.user.id
+    };
+    if(!d.amount){showAlert('error','Укажите сумму');return;}
+    const btn=document.getElementById('exp-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const {error}=await sb.from('expenses').insert(d);
+    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
+    else{showAlert('success','Расход добавлен');expState.modal=null;await loadAll();}
+  });
+  // Edit expense
+  document.querySelectorAll('[data-edit-exp]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      try{ expState.editModal = JSON.parse(el.dataset.editExp); render(); }
+      catch(e){ showAlert('error','Ошибка'); }
+    });
+  });
+  document.getElementById('edit-exp-close')?.addEventListener('click',()=>{expState.editModal=null;render();});
+  document.getElementById('edit-exp-close2')?.addEventListener('click',()=>{expState.editModal=null;render();});
+  document.getElementById('edit-exp-overlay')?.addEventListener('click',e=>{if(e.target.id==='edit-exp-overlay'){expState.editModal=null;render();}});
+  document.getElementById('edit-exp-save')?.addEventListener('click',async()=>{
+    const id = expState.editModal.id;
+    const d = {
+      date: document.getElementById('edit-exp-date').value,
+      type: document.getElementById('edit-exp-type').value,
+      amount: Number(document.getElementById('edit-exp-amount').value)||0,
+      description: document.getElementById('edit-exp-desc').value,
+    };
+    if(!d.amount){showAlert('error','Укажите сумму');return;}
+    const btn = document.getElementById('edit-exp-save');
+    btn.disabled=true; btn.textContent='Сохранение...';
+    const {error} = await sb.from('expenses').update(d).eq('id',id);
+    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
+    else{showAlert('success','Расход обновлён');expState.editModal=null;await loadAll();}
+  });
+
+  document.querySelectorAll('[data-del-exp]').forEach(el=>{
+    el.addEventListener('click',async()=>{
+      if(!confirm('Удалить расход?')) return;
+      await sb.from('expenses').delete().eq('id',el.dataset.delExp);
+      await loadAll();
+    });
+  });
+  document.getElementById('add-sal-btn')?.addEventListener('click',()=>{expState.salModal={};render();});
+  document.getElementById('sal-modal-close')?.addEventListener('click',()=>{expState.salModal=null;render();});
+  document.getElementById('sal-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='sal-modal-overlay'){expState.salModal=null;render();}});
+  document.getElementById('sal-save-btn')?.addEventListener('click',async()=>{
+    const d={
+      period:document.getElementById('sal-period').value,
+      point_id:expState.pointId,
+      employee:document.getElementById('sal-employee').value,
+      amount:Number(document.getElementById('sal-amount').value)||0,
+      user_id:STATE.user.id
+    };
+    if(!d.employee||!d.amount){showAlert('error','Заполните все поля');return;}
+    const btn=document.getElementById('sal-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const {error}=await sb.from('salaries').insert(d);
+    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
+    else{showAlert('success','Зарплата добавлена');expState.salModal=null;await loadAll();}
+  });
+  // Edit salary
+  document.querySelectorAll('[data-edit-sal]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      try{ expState.editSalModal = JSON.parse(el.dataset.editSal); render(); }
+      catch(e){ showAlert('error','Ошибка'); }
+    });
+  });
+  document.getElementById('edit-sal-close')?.addEventListener('click',()=>{expState.editSalModal=null;render();});
+  document.getElementById('edit-sal-overlay')?.addEventListener('click',e=>{if(e.target.id==='edit-sal-overlay'){expState.editSalModal=null;render();}});
+  document.getElementById('edit-sal-save')?.addEventListener('click',async()=>{
+    const id = expState.editSalModal.id;
+    const d = {
+      period: document.getElementById('edit-sal-period').value,
+      employee: document.getElementById('edit-sal-employee').value,
+      amount: Number(document.getElementById('edit-sal-amount').value)||0,
+    };
+    if(!d.employee||!d.amount){showAlert('error','Заполните все поля');return;}
+    const btn = document.getElementById('edit-sal-save');
+    btn.disabled=true; btn.textContent='Сохранение...';
+    const {error} = await sb.from('salaries').update(d).eq('id',id);
+    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
+    else{showAlert('success','Зарплата обновлена');expState.editSalModal=null;await loadAll();}
+  });
+
+  document.querySelectorAll('[data-del-sal]').forEach(el=>{
+    el.addEventListener('click',async()=>{
+      if(!confirm('Удалить запись?')) return;
+      await sb.from('salaries').delete().eq('id',el.dataset.delSal);
+      await loadAll();
+    });
+  });
+
+  // Bank
+  document.getElementById('bank-file-input')?.addEventListener('change',async(e)=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=async(ev)=>{
+      try{
+        const wb=XLSX.read(ev.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+        // Detect column positions from header row
+        const header = (rows[0]||[]).map(h=>String(h||'').toLowerCase());
+        const col = (keywords) => {
+          for(const kw of keywords){
+            const i = header.findIndex(h=>h.includes(kw));
+            if(i>=0) return i;
+          }
+          return -1;
+        };
+        const iDoc    = col(['документа','doc','№']);
+        const iDate   = col(['дата','date']);
+        const iDebit  = col(['дебет','debit']);
+        const iCredit = col(['кредит','credit']);
+        const iName   = col(['наименование','бенефициар','отправител','name','контраген']);
+        const iPurp   = col(['назначение','платеж','purpose','описание']);
+
+        const newTx=rows.slice(1).filter(r=>r.some(c=>c)).map(r=>{
+          // Auto-detect if no header match: fallback to positional
+          const getVal = (idx, fallbackIdx) => idx>=0 ? r[idx] : r[fallbackIdx];
+          return {
+            doc_no:      String(getVal(iDoc, 0)||''),
+            date:        String(getVal(iDate, 1)||''),
+            debit:       Number(String(getVal(iDebit, 2)||'').replace(/[^0-9.]/g,''))||0,
+            credit:      Number(String(getVal(iCredit, 3)||'').replace(/[^0-9.]/g,''))||0,
+            counterpart: String(getVal(iName, 4)||''),
+            purpose:     String(getVal(iPurp, 9)||''),
+            description: String(getVal(iName, 4)||''),
+            source_file: file.name,
+            approved:    false,
+          };
+        }).filter(r=>r.date||r.debit||r.credit);
+        if(!newTx.length){showAlert('error','Нет данных в файле');return;}
+        const {error}=await sb.from('bank_transactions').insert(newTx);
+        if(error){showAlert('error',error.message);}else{showAlert('success',`Загружено ${newTx.length} операций`);await loadAll();}
+      }catch(err){showAlert('error','Ошибка файла: '+err.message);}
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value='';
+  });
+  document.querySelectorAll('[data-approve-tx]').forEach(el=>{
+    el.addEventListener('click',async()=>{await sb.from('bank_transactions').update({approved:true,approved_by:STATE.user.id}).eq('id',el.dataset.approveTx);await loadAll();});
+  });
+  document.querySelectorAll('[data-del-tx]').forEach(el=>{
+    el.addEventListener('click',async()=>{await sb.from('bank_transactions').delete().eq('id',el.dataset.delTx);await loadAll();});
+  });
+
+  // Report — export buttons
+  document.getElementById('export-excel-btn')?.addEventListener('click',()=>{
+    if(window._lastReportData) exportExcel(window._lastReportData);
+    else showAlert('error','Нет данных для экспорта');
+  });
+  document.getElementById('export-pdf-btn')?.addEventListener('click',()=>{
+    if(window._lastReportData) exportPDF(window._lastReportData);
+    else showAlert('error','Нет данных для экспорта');
+  });
+
+  // Report — point tabs
+  document.querySelectorAll('[data-report-point]').forEach(el=>{
+    el.addEventListener('click',()=>{reportState.pointId=el.dataset.reportPoint;render();});
+  });
+  document.getElementById('report-days')?.addEventListener('change',e=>{reportState.days=e.target.value;render();});
+
+  // Staff page
+  document.getElementById('add-emp-btn')?.addEventListener('click',()=>{staffModal={};render();});
+  document.getElementById('staff-modal-close')?.addEventListener('click',()=>{staffModal=null;render();});
+  document.getElementById('staff-modal-close2')?.addEventListener('click',()=>{staffModal=null;render();});
+  document.getElementById('staff-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='staff-modal-overlay'){staffModal=null;render();}});
+  document.getElementById('emp-save-btn')?.addEventListener('click',async()=>{
+    const d={
+      name:document.getElementById('emp-name').value.trim(),
+      position:document.getElementById('emp-position').value.trim(),
+      point_id:document.getElementById('emp-point').value||null,
+      monthly_salary:Number(document.getElementById('emp-salary').value)||0,
+      phone:document.getElementById('emp-phone').value.trim(),
+      hire_date:document.getElementById('emp-hire').value,
+    };
+    if(!d.name){showAlert('error','Введите имя сотрудника');return;}
+    const btn=document.getElementById('emp-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const {error}=await sb.from('staff').insert(d);
+    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Добавить';}
+    else{showAlert('success','Сотрудник добавлен');staffModal=null;staffLoaded=false;render();}
+  });
+  document.querySelectorAll('[data-del-emp]').forEach(el=>{
+    el.addEventListener('click',async()=>{
+      if(!confirm('Удалить сотрудника?')) return;
+      await sb.from('staff_advances').delete().eq('employee_id',el.dataset.delEmp);
+      await sb.from('staff_salary_payments').delete().eq('employee_id',el.dataset.delEmp);
+      await sb.from('staff').delete().eq('id',el.dataset.delEmp);
+      staffLoaded=false;render();
+    });
+  });
+
+  // Advance modal
+  document.querySelectorAll('[data-advance-emp]').forEach(el=>{
+    el.addEventListener('click',()=>{advanceModal={id:el.dataset.advanceEmp,name:el.dataset.advanceName};render();});
+  });
+  document.getElementById('advance-close')?.addEventListener('click',()=>{advanceModal=null;render();});
+  document.getElementById('advance-close2')?.addEventListener('click',()=>{advanceModal=null;render();});
+  document.getElementById('advance-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='advance-modal-overlay'){advanceModal=null;render();}});
+  document.getElementById('adv-save-btn')?.addEventListener('click',async()=>{
+    const d={
+      employee_id:advanceModal.id,
+      date:document.getElementById('adv-date').value,
+      amount:Number(document.getElementById('adv-amount').value)||0,
+      note:document.getElementById('adv-note').value,
+    };
+    if(!d.amount){showAlert('error','Укажите сумму');return;}
+    const btn=document.getElementById('adv-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const {error}=await sb.from('staff_advances').insert(d);
+    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
+    else{showAlert('success','Аванс записан');advanceModal=null;staffLoaded=false;render();}
+  });
+
+  // Salary payment modal
+  document.querySelectorAll('[data-salpay-emp]').forEach(el=>{
+    el.addEventListener('click',()=>{salPayModal={id:el.dataset.salpayEmp,name:el.dataset.salpayName};render();});
+  });
+  document.getElementById('salpay-close')?.addEventListener('click',()=>{salPayModal=null;render();});
+  document.getElementById('salpay-close2')?.addEventListener('click',()=>{salPayModal=null;render();});
+  document.getElementById('salpay-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='salpay-modal-overlay'){salPayModal=null;render();}});
+  document.getElementById('salpay-save-btn')?.addEventListener('click',async()=>{
+    const d={
+      employee_id:salPayModal.id,
+      date:document.getElementById('salpay-date').value,
+      amount:Number(document.getElementById('salpay-amount').value)||0,
+      note:document.getElementById('salpay-note').value,
+    };
+    if(!d.amount){showAlert('error','Укажите сумму');return;}
+    const btn=document.getElementById('salpay-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const {error}=await sb.from('staff_salary_payments').insert(d);
+    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
+    else{showAlert('success','Зарплата выдана');salPayModal=null;staffLoaded=false;render();}
+  });
+
+  // Cariler — new debtor
+  document.getElementById('caril-save-btn')?.addEventListener('click',async()=>{
+    const d={
+      name:document.getElementById('c-name').value.trim(),
+      phone:document.getElementById('c-phone').value.trim(),
+      total_debt:Number(document.getElementById('c-debt').value)||0,
+      date:document.getElementById('c-date').value,
+      description:document.getElementById('c-desc').value.trim(),
+      point_id:carilerPoint,
+    };
+    if(!d.name||!d.total_debt){showAlert('error','Заполните имя и сумму долга');return;}
+    const btn=document.getElementById('caril-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const {error}=await sb.from('debtors').insert(d);
+    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Добавить';}
+    else{showAlert('success','Должник добавлен');carilerModal=null;carilerLoaded=false;render();}
+  });
+
+  // Cariler — record payment
+  document.getElementById('pay-save-btn')?.addEventListener('click',async()=>{
+    const d={
+      debtor_id:paymentModal.id,
+      date:document.getElementById('pay-date').value,
+      amount:Number(document.getElementById('pay-amount').value)||0,
+      note:document.getElementById('pay-note').value,
+    };
+    if(!d.amount){showAlert('error','Укажите сумму');return;}
+    if(d.amount>paymentModal.remaining+0.01){
+      if(!confirm('Сумма превышает остаток долга. Продолжить?')) return;
+    }
+    const btn=document.getElementById('pay-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const {error}=await sb.from('debtor_payments').insert(d);
+    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
+    else{showAlert('success','Оплата записана');paymentModal=null;carilerLoaded=false;render();}
+  });
+
+  // Profile page — change own password
+  document.getElementById('prof-save-pass')?.addEventListener('click', async()=>{
+    const curPass = document.getElementById('cur-pass').value;
+    const newPass = document.getElementById('prof-new-pass').value;
+    const newPass2 = document.getElementById('prof-new-pass2').value;
+    const alertDiv = document.getElementById('profile-alert');
+    if(!curPass||!newPass||!newPass2){alertDiv.innerHTML='<div class="alert alert-error">Заполните все поля</div>';return;}
+    if(newPass!==newPass2){alertDiv.innerHTML='<div class="alert alert-error">Пароли не совпадают</div>';return;}
+    if(newPass.length<4){alertDiv.innerHTML='<div class="alert alert-error">Минимум 4 символа</div>';return;}
+    if(curPass!==STATE.user.password){alertDiv.innerHTML='<div class="alert alert-error">Неверный текущий пароль</div>';return;}
+    const btn=document.getElementById('prof-save-pass');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const {error}=await sb.from('users').update({password:newPass}).eq('id',STATE.user.id);
+    if(error){
+      alertDiv.innerHTML=`<div class="alert alert-error">${error.message}</div>`;
+      btn.disabled=false;btn.textContent='🔑 Изменить пароль';
+    } else {
+      STATE.user.password=newPass;
+      sessionStorage.setItem('uchet_user',JSON.stringify(STATE.user));
+      alertDiv.innerHTML='<div class="alert alert-success">✓ Пароль успешно изменён!</div>';
+      btn.disabled=false;btn.textContent='🔑 Изменить пароль';
+      document.getElementById('cur-pass').value='';
+      document.getElementById('prof-new-pass').value='';
+      document.getElementById('prof-new-pass2').value='';
+    }
+  });
+
+  // Users
+  document.getElementById('add-user-btn')?.addEventListener('click',()=>{userModal=true;render();});
+  document.getElementById('user-modal-close')?.addEventListener('click',()=>{userModal=false;render();});
+  document.getElementById('user-modal-close2')?.addEventListener('click',()=>{userModal=false;render();});
+  document.getElementById('user-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='user-modal-overlay'){userModal=false;render();}});
+  document.getElementById('user-save-btn')?.addEventListener('click',async()=>{
+    const d={name:document.getElementById('u-name').value,login:document.getElementById('u-login').value,password:document.getElementById('u-pass').value,role:document.getElementById('u-role').value,point_id:document.getElementById('u-point').value||null};
+    if(!d.name||!d.login||!d.password){showAlert('error','Заполните все поля');return;}
+    const {error}=await sb.from('users').insert(d);
+    if(error){showAlert('error',error.message);}
+    else{showAlert('success','Пользователь создан');userModal=false;usersLoaded=false;render();}
+  });
+  document.querySelectorAll('[data-del-user]').forEach(el=>{
+    el.addEventListener('click',async()=>{
+      if(!confirm('Удалить пользователя?')) return;
+      await sb.from('users').delete().eq('id',el.dataset.delUser);
+      usersLoaded=false;render();
+    });
+  });
+
+  // Admin — change other user's password
+  document.querySelectorAll('[data-pass-user]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      passModal={userId:el.dataset.passUser, name:el.dataset.passName};
+      render();
+    });
+  });
+  document.getElementById('pass-modal-close')?.addEventListener('click',()=>{passModal=null;render();});
+  document.getElementById('pass-modal-close2')?.addEventListener('click',()=>{passModal=null;render();});
+  document.getElementById('pass-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='pass-modal-overlay'){passModal=null;render();}});
+  document.getElementById('pass-save-btn')?.addEventListener('click',async()=>{
+    const np=document.getElementById('new-pass').value;
+    const np2=document.getElementById('new-pass2').value;
+    const errDiv=document.getElementById('pass-err');
+    if(!np||!np2){errDiv.innerHTML='<div class="alert alert-error">Заполните оба поля</div>';return;}
+    if(np!==np2){errDiv.innerHTML='<div class="alert alert-error">Пароли не совпадают</div>';return;}
+    if(np.length<4){errDiv.innerHTML='<div class="alert alert-error">Минимум 4 символа</div>';return;}
+    const btn=document.getElementById('pass-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    const {error}=await sb.from('users').update({password:np}).eq('id',passModal.userId);
+    if(error){errDiv.innerHTML=`<div class="alert alert-error">${error.message}</div>`;btn.disabled=false;btn.textContent='Сохранить';}
+    else{showAlert('success','Пароль изменён для: '+passModal.name);passModal=null;usersLoaded=false;render();}
+  });
+}
+
+
+
+// ─── PROFILE ──────────────────────────────────────────────────────────────────
+function renderProfile(){
+  const u = STATE.user;
+  const pt = u.point_id ? POINTS.find(p=>p.id===u.point_id)?.name : 'Все точки';
+  return `
+    <div class="section-title">Мои данные</div>
+    <div class="table-card" style="padding:20px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
+        <div><div class="stat-label">Имя</div><div style="font-size:15px;font-weight:600;margin-top:4px;">${u.name}</div></div>
+        <div><div class="stat-label">Логин</div><div style="font-size:15px;font-weight:600;margin-top:4px;">${u.login}</div></div>
+        <div><div class="stat-label">Роль</div><div style="margin-top:4px;"><span class="badge ${u.role==='admin'?'badge-y':'badge-b'}">${u.role==='admin'?'Администратор':'Оператор'}</span></div></div>
+        <div><div class="stat-label">Точка</div><div style="font-size:15px;font-weight:600;margin-top:4px;">${pt}</div></div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:20px;">Изменить пароль</div>
+    <div class="table-card" style="padding:20px;max-width:420px;">
+      <div id="profile-alert"></div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="form-group">
+          <label>Текущий пароль</label>
+          <input class="form-control" type="password" id="cur-pass" placeholder="Введите текущий пароль"/>
+        </div>
+        <div class="form-group">
+          <label>Новый пароль</label>
+          <input class="form-control" type="password" id="prof-new-pass" placeholder="Минимум 4 символа"/>
+        </div>
+        <div class="form-group">
+          <label>Повторите новый пароль</label>
+          <input class="form-control" type="password" id="prof-new-pass2" placeholder="Повторите пароль"/>
+        </div>
+        <button class="btn btn-primary" id="prof-save-pass" style="align-self:flex-start;padding:10px 20px;">
+          🔑 Изменить пароль
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+
+// ─── STAFF / SALARY TRACKING ─────────────────────────────────────────────────
+function renderStaff(){
+  if(!staffLoaded){
+    Promise.all([
+      sb.from('staff').select('*').order('name'),
+      sb.from('staff_advances').select('*').order('date',{ascending:false}),
+      sb.from('staff_salary_payments').select('*').order('date',{ascending:false}),
+    ]).then(([s,a,p])=>{
+      staffData = {
+        employees: s.data||[],
+        advances: a.data||[],
+        payments: p.data||[],
+      };
+      staffLoaded=true;
+      render();
+    });
+    return '<div class="loading-screen" style="min-height:200px;"><div class="spinner"></div></div>';
+  }
+
+  const {employees, advances, payments} = staffData;
+
+  // Summary per employee
+  const empSummary = employees.map(emp=>{
+    const empAdv = advances.filter(a=>a.employee_id===emp.id);
+    const empPay = payments.filter(p=>p.employee_id===emp.id);
+    const totalAdvances = empAdv.reduce((s,a)=>s+Number(a.amount||0),0);
+    const totalPaid = empPay.reduce((s,p)=>s+Number(p.amount||0),0);
+    const totalOwed = totalAdvances + totalPaid; // what's been given
+    const remaining = Number(emp.monthly_salary||0) - totalOwed % Number(emp.monthly_salary||1);
+    const netRemaining = Number(emp.monthly_salary||0) - (totalAdvances + totalPaid) % (Number(emp.monthly_salary||1)||1);
+    // simpler: this month
+    const thisMonth = new Date().toISOString().slice(0,7);
+    const monthAdv = empAdv.filter(a=>a.date?.startsWith(thisMonth)).reduce((s,a)=>s+Number(a.amount||0),0);
+    const monthPay = empPay.filter(p=>p.date?.startsWith(thisMonth)).reduce((s,p)=>s+Number(p.amount||0),0);
+    const monthRemaining = Number(emp.monthly_salary||0) - monthAdv - monthPay;
+    return {...emp, totalAdvances, totalPaid, monthAdv, monthPay, monthRemaining};
+  });
+
+  const totalSalaryBudget = employees.reduce((s,e)=>s+Number(e.monthly_salary||0),0);
+  const totalAdvancesGiven = advances.reduce((s,a)=>s+Number(a.amount||0),0);
+  const totalPaidOut = payments.reduce((s,p)=>s+Number(p.amount||0),0);
+
+  const empCards = empSummary.map(emp=>`
+    <div class="table-card" style="margin-bottom:14px;">
+      <div class="table-head">
+        <div>
+          <h3 style="font-size:14px;">👤 ${emp.name}</h3>
+          <span style="font-size:11px;color:var(--text3);">${POINTS.find(p=>p.id===emp.point_id)?.name||'—'} · ${emp.position||'—'}</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" style="font-size:11px;" data-advance-emp="${emp.id}" data-advance-name="${emp.name}">💰 Авансировать</button>
+          <button class="btn btn-success" style="font-size:11px;" data-salpay-emp="${emp.id}" data-salpay-name="${emp.name}">✅ Выдать зарплату</button>
+          <button class="btn btn-danger" style="font-size:11px;" data-del-emp="${emp.id}">✕</button>
+        </div>
+      </div>
+      <div style="padding:16px;">
+        <div class="stats-grid" style="margin-bottom:14px;">
+          <div class="stat-card"><div class="stat-label">Оклад (месяц)</div><div class="stat-value y" style="font-size:16px;">${fmt(emp.monthly_salary)}</div></div>
+          <div class="stat-card"><div class="stat-label">Авансы (этот месяц)</div><div class="stat-value r" style="font-size:16px;">${fmt(emp.monthAdv)}</div></div>
+          <div class="stat-card"><div class="stat-label">Выдано зарплаты</div><div class="stat-value b" style="font-size:16px;">${fmt(emp.monthPay)}</div></div>
+          <div class="stat-card" style="border-color:${emp.monthRemaining>=0?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)'};">
+            <div class="stat-label">Остаток к выдаче</div>
+            <div class="stat-value" style="font-size:16px;color:${emp.monthRemaining>=0?'var(--accent3)':'var(--accent2)'};">${fmt(emp.monthRemaining)}</div>
+          </div>
+        </div>
+
+        ${advances.filter(a=>a.employee_id===emp.id).length>0||payments.filter(p=>p.employee_id===emp.id).length>0?`
+        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">История</div>
+        <div style="max-height:180px;overflow-y:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:var(--bg3);">
+              <th style="padding:6px 10px;text-align:left;">Дата</th>
+              <th style="padding:6px 10px;text-align:left;">Тип</th>
+              <th style="padding:6px 10px;text-align:right;">Сумма</th>
+              <th style="padding:6px 10px;">Описание</th>
+            </tr></thead>
+            <tbody>
+              ${[
+                ...advances.filter(a=>a.employee_id===emp.id).map(a=>`<tr style="border-top:1px solid var(--border);">
+                  <td style="padding:6px 10px;">${fmtDate(a.date)}</td>
+                  <td style="padding:6px 10px;"><span class="badge badge-r">Аванс</span></td>
+                  <td style="padding:6px 10px;text-align:right;color:var(--accent2);">${fmt(a.amount)}</td>
+                  <td style="padding:6px 10px;color:var(--text3);">${a.note||'—'}</td>
+                </tr>`),
+                ...payments.filter(p=>p.employee_id===emp.id).map(p=>`<tr style="border-top:1px solid var(--border);">
+                  <td style="padding:6px 10px;">${fmtDate(p.date)}</td>
+                  <td style="padding:6px 10px;"><span class="badge badge-g">Зарплата</span></td>
+                  <td style="padding:6px 10px;text-align:right;color:var(--accent3);">${fmt(p.amount)}</td>
+                  <td style="padding:6px 10px;color:var(--text3);">${p.note||'—'}</td>
+                </tr>`)
+              ].join('')}
+            </tbody>
+          </table>
+        </div>`:
+        '<div style="color:var(--text3);font-size:12px;padding:8px 0;">Нет истории операций</div>'}
+      </div>
+    </div>
+  `).join('');
+
+  // Add employee modal
+  const newEmpModal = staffModal ? `
+    <div class="modal-overlay" id="staff-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>➕ Новый сотрудник</h3><button class="close-btn" id="staff-modal-close">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>ФИО</label><input class="form-control" id="emp-name" placeholder="Имя Фамилия"/></div>
+            <div class="form-group"><label>Должность</label><input class="form-control" id="emp-position" placeholder="Продавец, Кассир..."/></div>
+            <div class="form-group"><label>Точка</label>
+              <select class="form-control" id="emp-point">
+                <option value="">— выберите —</option>
+                ${POINTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group"><label>Оклад (месяц) ₸</label><input type="number" class="form-control" id="emp-salary" placeholder="0"/></div>
+            <div class="form-group"><label>Телефон</label><input class="form-control" id="emp-phone" placeholder="+7..."/></div>
+            <div class="form-group"><label>Дата найма</label><input type="date" class="form-control" id="emp-hire" value="${today()}"/></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="staff-modal-close2">Отмена</button>
+          <button class="btn btn-primary" id="emp-save-btn">Добавить</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  // Advance modal
+  const advModal = advanceModal ? `
+    <div class="modal-overlay" id="advance-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>💰 Аванс — ${advanceModal.name}</h3><button class="close-btn" id="advance-close">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="adv-date" value="${today()}"/></div>
+            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="adv-amount" placeholder="0"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Примечание</label><input class="form-control" id="adv-note" placeholder="Необязательно"/></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="advance-close2">Отмена</button>
+          <button class="btn btn-primary" id="adv-save-btn">Сохранить</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  // Salary payment modal
+  const salPayModalHtml = salPayModal ? `
+    <div class="modal-overlay" id="salpay-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>✅ Выдача зарплаты — ${salPayModal.name}</h3><button class="close-btn" id="salpay-close">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="salpay-date" value="${today()}"/></div>
+            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="salpay-amount" placeholder="0"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Примечание</label><input class="form-control" id="salpay-note" placeholder="Необязательно"/></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" id="salpay-close2">Отмена</button>
+          <button class="btn btn-primary" id="salpay-save-btn">Сохранить</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="stats-grid" style="margin-bottom:20px;">
+      <div class="stat-card"><div class="stat-label">Сотрудников</div><div class="stat-value y">${employees.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Фонд зарплат</div><div class="stat-value b">${fmt(totalSalaryBudget)}</div><div class="stat-sub">в месяц</div></div>
+      <div class="stat-card"><div class="stat-label">Выдано авансов</div><div class="stat-value r">${fmt(totalAdvancesGiven)}</div></div>
+      <div class="stat-card"><div class="stat-label">Выдано зарплат</div><div class="stat-value g">${fmt(totalPaidOut)}</div></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+      <button class="btn btn-primary" id="add-emp-btn">➕ Добавить сотрудника</button>
+    </div>
+    ${employees.length===0?'<div class="empty">Нет сотрудников. Добавьте первого.</div>':empCards}
+    ${newEmpModal}${advModal}${salPayModalHtml}
+  `;
+}
+
+
+// ─── CARİLER (ДОЛЖНИКИ) ───────────────────────────────────────────────────────
+let carilerData = [];
+let carilerLoaded = false;
+let carilerModal = null;   // new debtor
+let paymentModal = null;   // record payment
+let carilerPoint = '';     // selected point
+
+function renderCariler(){
+  const accessPoints = STATE.user.role==='admin'
+    ? POINTS.filter(p=>['mkr17','mkr5','baza'].includes(p.id))
+    : POINTS.filter(p=>p.id===STATE.user.point_id&&['mkr17','mkr5','baza'].includes(p.id));
+
+  if(!carilerPoint && accessPoints[0]) carilerPoint = accessPoints[0].id;
+
+  if(!carilerLoaded){
+    Promise.all([
+      sb.from('debtors').select('*').order('name'),
+      sb.from('debtor_payments').select('*').order('date',{ascending:false}),
+    ]).then(([d,p])=>{
+      carilerData = {debtors: d.data||[], payments: p.data||[]};
+      carilerLoaded = true;
+      render();
+    });
+    return '<div class="loading-screen" style="min-height:200px;"><div class="spinner"></div></div>';
+  }
+
+  const {debtors, payments} = carilerData;
+
+  // Filter by selected point
+  const ptDebtors = debtors.filter(d=>d.point_id===carilerPoint);
+
+  // Enrich with payment history
+  const enriched = ptDebtors.map(d=>{
+    const dPay = payments.filter(p=>p.debtor_id===d.id);
+    const totalPaid = dPay.reduce((s,p)=>s+Number(p.amount||0),0);
+    const remaining = Number(d.total_debt||0) - totalPaid;
+    return {...d, totalPaid, remaining, payments: dPay};
+  });
+
+  const totalDebt = enriched.reduce((s,d)=>s+Number(d.total_debt||0),0);
+  const totalPaid = enriched.reduce((s,d)=>s+d.totalPaid,0);
+  const totalRemaining = enriched.reduce((s,d)=>s+d.remaining,0);
+
+  // Point tabs
+  const tabs = accessPoints.map(p=>`
+    <div class="tab ${carilerPoint===p.id?'active':''}" onclick="carilerPoint='${p.id}';carilerLoaded=false;render();">
+      ${p.name}
+    </div>`).join('');
+
+  // Debtor cards
+  const debtorCards = enriched.length===0
+    ? '<div class="empty">Нет должников для этой точки</div>'
+    : enriched.sort((a,b)=>b.remaining-a.remaining).map(d=>`
+    <div class="table-card" style="margin-bottom:12px;">
+      <div class="table-head">
+        <div>
+          <h3 style="font-size:14px;">👤 ${d.name}</h3>
+          <span style="font-size:11px;color:var(--text3);">${d.phone||'—'} · ${fmtDate(d.date)}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div style="text-align:right;margin-right:8px;">
+            <div style="font-size:10px;color:var(--text3);">Остаток долга</div>
+            <div style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:${d.remaining>0?'var(--accent2)':d.remaining<0?'var(--accent3)':'var(--text3)'};">${fmt(d.remaining)}</div>
+          </div>
+          ${d.remaining>0?`<button class="btn btn-success" style="font-size:11px;" onclick="paymentModal={id:'${d.id}',name:'${d.name}',remaining:${d.remaining}};render();">💵 Оплата</button>`:'<span class="badge badge-g">✅ Погашен</span>'}
+          <button class="btn btn-danger" style="font-size:11px;" onclick="if(confirm('Удалить?')){sb.from('debtor_payments').delete().eq('debtor_id','${d.id}').then(()=>sb.from('debtors').delete().eq('id','${d.id}').then(()=>{carilerLoaded=false;render();}));}">✕</button>
+        </div>
+      </div>
+      <div style="padding:12px 16px;">
+        <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
+          <div><span style="font-size:10px;color:var(--text3);">Общий долг:</span> <b style="color:var(--accent2);">${fmt(d.total_debt)}</b></div>
+          <div><span style="font-size:10px;color:var(--text3);">Оплачено:</span> <b style="color:var(--accent3);">${fmt(d.totalPaid)}</b></div>
+          ${d.description?`<div><span style="font-size:10px;color:var(--text3);">Описание:</span> <span style="font-size:12px;">${d.description}</span></div>`:''}
+        </div>
+        ${d.payments.length>0?`
+        <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">История оплат</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          ${d.payments.map(p=>`
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg3);border-radius:6px;font-size:12px;">
+              <span style="color:var(--text2);">${fmtDate(p.date)}</span>
+              <span style="color:var(--accent3);font-weight:600;">+${fmt(p.amount)}</span>
+              <span style="color:var(--text3);">${p.note||''}</span>
+            </div>`).join('')}
+        </div>`:''}
+      </div>
+    </div>`).join('');
+
+  // New debtor modal
+  const newModal = carilerModal ? `
+    <div class="modal-overlay" id="caril-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>➕ Новый должник</h3><button class="close-btn" onclick="carilerModal=null;render();">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>ФИО / Название</label><input class="form-control" id="c-name" placeholder="Имя должника"/></div>
+            <div class="form-group"><label>Телефон</label><input class="form-control" id="c-phone" placeholder="+7..."/></div>
+            <div class="form-group"><label>Сумма долга ₸</label><input type="number" class="form-control" id="c-debt" placeholder="0"/></div>
+            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="c-date" value="${today()}"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Описание</label><input class="form-control" id="c-desc" placeholder="Товар, причина долга..."/></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" onclick="carilerModal=null;render();">Отмена</button>
+          <button class="btn btn-primary" id="caril-save-btn">Добавить</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  // Payment modal
+  const payModal = paymentModal ? `
+    <div class="modal-overlay" id="pay-modal-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>💵 Оплата долга — ${paymentModal.name}</h3><button class="close-btn" onclick="paymentModal=null;render();">✕</button></div>
+        <div class="modal-body">
+          <div class="alert alert-warn">Остаток долга: <b>${fmt(paymentModal.remaining)}</b></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="pay-date" value="${today()}"/></div>
+            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="pay-amount" placeholder="0" value="${paymentModal.remaining}"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Примечание</label><input class="form-control" id="pay-note" placeholder="Необязательно"/></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" onclick="paymentModal=null;render();">Отмена</button>
+          <button class="btn btn-primary" id="pay-save-btn">Сохранить</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="alert alert-warn" style="margin-bottom:16px;">
+      ℹ️ Карточки должников не влияют на расчёт прибыли — только для учёта.
+    </div>
+    <div class="stats-grid" style="margin-bottom:20px;">
+      <div class="stat-card"><div class="stat-label">Должников</div><div class="stat-value y">${enriched.length}</div></div>
+      <div class="stat-card"><div class="stat-label">Общий долг</div><div class="stat-value r">${fmt(totalDebt)}</div></div>
+      <div class="stat-card"><div class="stat-label">Оплачено</div><div class="stat-value g">${fmt(totalPaid)}</div></div>
+      <div class="stat-card" style="border-color:${totalRemaining>0?'rgba(239,68,68,.3)':'rgba(16,185,129,.3)'};">
+        <div class="stat-label">Остаток долга</div>
+        <div class="stat-value" style="color:${totalRemaining>0?'var(--accent2)':'var(--accent3)'};">${fmt(totalRemaining)}</div>
+      </div>
+    </div>
+    <div class="tabs" style="margin-bottom:16px;">${tabs}</div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+      <button class="btn btn-primary" onclick="carilerModal={};render();">➕ Добавить должника</button>
+    </div>
+    ${debtorCards}
+    ${newModal}${payModal}
+  `;
+}
+
+// ─── BACKUP / RESTORE ────────────────────────────────────────────────────────
+async function downloadBackup(){
+  try{
+    const [e,ex,sal,bk,us] = await Promise.all([
+      sb.from('daily_entries').select('*'),
+      sb.from('expenses').select('*'),
+      sb.from('salaries').select('*'),
+      sb.from('bank_transactions').select('*'),
+      sb.from('users').select('*'),
+    ]);
+    const backup = {
+      version: '1.0',
+      date: new Date().toISOString(),
+      project: 'Istanbul Et Market',
+      daily_entries: e.data||[],
+      expenses: ex.data||[],
+      salaries: sal.data||[],
+      bank_transactions: bk.data||[],
+      users: us.data||[],
+    };
+    const json = JSON.stringify(backup, null, 2);
+    const blob = new Blob([json], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'backup_istanbul_et_market_' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showAlert('success', 'Резервная копия скачана!');
+  }catch(err){
+    showAlert('error', 'Ошибка резервной копии: ' + err.message);
+  }
+}
+
+async function restoreBackup(file){
+  if(!file) return;
+  if(!confirm('ВНИМАНИЕ! Восстановление перезапишет данные. Продолжить?')) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!data.version || !data.daily_entries) throw new Error('Неверный формат файла резервной копии');
+    showAlert('warn', 'Восстановление... Не закрывайте страницу.');
+
+    // Clear and restore each table
+    if(data.daily_entries?.length){
+      await sb.from('daily_entries').delete().neq('id','00000000-0000-0000-0000-000000000000');
+      await sb.from('daily_entries').insert(data.daily_entries);
+    }
+    if(data.expenses?.length){
+      await sb.from('expenses').delete().neq('id','00000000-0000-0000-0000-000000000000');
+      await sb.from('expenses').insert(data.expenses);
+    }
+    if(data.salaries?.length){
+      await sb.from('salaries').delete().neq('id','00000000-0000-0000-0000-000000000000');
+      await sb.from('salaries').insert(data.salaries);
+    }
+    if(data.bank_transactions?.length){
+      await sb.from('bank_transactions').delete().neq('id','00000000-0000-0000-0000-000000000000');
+      await sb.from('bank_transactions').insert(data.bank_transactions);
+    }
+    await loadAll();
+    showAlert('success', 'Данные успешно восстановлены из резервной копии!');
+  }catch(err){
+    showAlert('error', 'Ошибка восстановления: ' + err.message);
+  }
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+const saved = sessionStorage.getItem('uchet_user');
+if(saved){try{STATE.user=JSON.parse(saved);}catch{}}
+STATE.loading=false;
+render();
+if(STATE.user) loadAll();
+</script>
+</body>
+</html>
