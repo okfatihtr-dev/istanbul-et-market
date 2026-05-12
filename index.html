@@ -180,7 +180,7 @@ const CATS = {
   polf: ['Полфабрикат'],
   ofis: [],
 };
-EXP_TYPES_DEFAULT = ['Аренда','Зарплата','Электричество','Транспорт','Коммунальные','Уборка','Упаковка','Ремонт','Прочее'];
+const EXP_TYPES_DEFAULT = ['Аренда','Зарплата','Электричество','Транспорт','Коммунальные','Уборка','Упаковка','Ремонт','Прочее'];
 function getExpTypes(){
   try{ const s=localStorage.getItem('exp_types'); return s?JSON.parse(s):EXP_TYPES_DEFAULT; }
   catch{return EXP_TYPES_DEFAULT;}
@@ -236,13 +236,18 @@ function showAlert(type, msg){
 async function loadAll(){
   setState({dataLoaded:false});
   try{
-    const [e,ex,sal,bk] = await Promise.all([
+    const [e,ex,sal,bk,staff,adv,salPay] = await Promise.all([
       sb.from('daily_entries').select('*').order('date',{ascending:false}),
       sb.from('expenses').select('*').order('date',{ascending:false}),
       sb.from('salaries').select('*').order('created_at',{ascending:false}),
       sb.from('bank_transactions').select('*').order('created_at',{ascending:false}),
+      sb.from('staff').select('*'),
+      sb.from('staff_advances').select('*'),
+      sb.from('staff_salary_payments').select('*'),
     ]);
-    setState({entries:e.data||[], expenses:ex.data||[], salaries:sal.data||[], bankTx:bk.data||[], dataLoaded:true});
+    setState({entries:e.data||[], expenses:ex.data||[], salaries:sal.data||[], bankTx:bk.data||[],
+      staffCache:staff.data||[], advancesCache:adv.data||[], salPayCache:salPay.data||[],
+      dataLoaded:true});
   }catch(err){
     setState({dataLoaded:true});
     showAlert('error','Ошибка загрузки: '+err.message);
@@ -582,14 +587,22 @@ function renderExpenses(accessPoints){
     if(expState.filterType && e.type!==expState.filterType) return false;
     return true;
   });
-  const visSal = STATE.salaries.filter(s=>s.point_id===selPoint);
   const totExp = visExp.reduce((s,e)=>s+Number(e.amount||0),0);
-  const totSal = visSal.reduce((s,e)=>s+Number(e.amount||0),0);
+  const visSal = STATE.salaries.filter(s => s.point_id === selPoint);
+
+  // Salary costs come from Staff module only
+  const ptStaff = (STATE.staffCache||[]).filter(emp=>emp.point_id===selPoint).map(e=>e.id);
+  const ptAdvances = (STATE.advancesCache||[]).filter(a=>ptStaff.includes(a.employee_id));
+  const ptSalPays = (STATE.salPayCache||[]).filter(p=>ptStaff.includes(p.employee_id));
+  const totSal = [...ptAdvances,...ptSalPays].reduce((s,e)=>s+Number(e.amount||0),0);
 
   // Point summary cards (all points)
   const allPtCards = accessPoints.map(p=>{
     const pExp = STATE.expenses.filter(e=>e.point_id===p.id).reduce((s,e)=>s+Number(e.amount||0),0);
-    const pSal = STATE.salaries.filter(s=>s.point_id===p.id).reduce((s,e)=>s+Number(e.amount||0),0);
+    const pStaffIds = (STATE.staffCache||[]).filter(emp=>emp.point_id===p.id).map(e=>e.id);
+    const pSal = [...(STATE.advancesCache||[]).filter(a=>pStaffIds.includes(a.employee_id)),
+                  ...(STATE.salPayCache||[]).filter(sp=>pStaffIds.includes(sp.employee_id))]
+                 .reduce((s,e)=>s+Number(e.amount||0),0);
     const isActive = p.id===selPoint;
     return `<div class="stat-card" style="cursor:pointer;border-color:${isActive?'var(--accent)':'var(--border)'};" data-exp-point="${p.id}">
       <div class="stat-label">${p.name}</div>
@@ -665,7 +678,7 @@ function renderExpenses(accessPoints){
       <div style="display:flex;gap:8px;">
         <div class="stat-card" style="padding:10px 16px;display:inline-flex;gap:16px;align-items:center;">
           <span style="font-size:11px;color:var(--text3);">Расходы: <b style="color:var(--accent2);">${fmt(totExp)}</b></span>
-          <span style="font-size:11px;color:var(--text3);">Зарплаты: <b style="color:var(--accent2);">${fmt(totSal)}</b></span>
+          <span style="font-size:11px;color:var(--text3);">Зарплаты (персонал): <b style="color:var(--accent2);">${fmt(totSal)}</b></span>
           <span style="font-size:11px;color:var(--text3);">Итого: <b style="color:var(--accent);">${fmt(totExp+totSal)}</b></span>
         </div>
       </div>
@@ -697,8 +710,7 @@ function renderExpenses(accessPoints){
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
       <div class="tabs" style="margin:0;">
-        <div class="tab ${expState.tab==='expenses'?'active':''}" data-exp-tab="expenses">💸 Расходы (${visExp.length})</div>
-        <div class="tab ${expState.tab==='salaries'?'active':''}" data-exp-tab="salaries">👤 Зарплаты (${visSal.length})</div>
+        <div class="tab active" data-exp-tab="expenses">💸 Расходы (${visExp.length})</div>
       </div>
       <button class="btn btn-ghost" id="manage-cats-btn" style="font-size:11px;padding:6px 12px;">⚙️ Категории расходов</button>
     </div>
@@ -727,14 +739,9 @@ function renderExpenses(accessPoints){
     </div>
     <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:15%"><col style="width:20%"><col style="width:15%"><col style="width:32%"><col style="width:18%"></colgroup><thead><tr><th>Дата</th><th>Тип</th><th class="num">Сумма</th><th>Описание</th><th></th></tr></thead>
       <tbody>${expRows||'<tr><td colspan="5"><div class="empty">Нет расходов для этой точки</div></td></tr>'}</tbody>
-    </table></div>`:`
-    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <button class="btn btn-primary" id="add-sal-btn">+ Добавить зарплату</button>
-    </div>
-    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:18%"><col style="width:35%"><col style="width:25%"><col style="width:22%"></colgroup><thead><tr><th>Период</th><th>Сотрудник</th><th class="num">Сумма</th><th></th></tr></thead>
-      <tbody>${salRows||'<tr><td colspan="4"><div class="empty">Нет зарплат для этой точки</div></td></tr>'}</tbody>
-    </table></div>`}
-    ${expModal}${salModal}
+    </table></div>` :
+    `${expModal}${salModal}`}
+
 
     ${expState.editModal ? `
     <div class="modal-overlay" id="edit-exp-overlay">
@@ -755,23 +762,7 @@ function renderExpenses(accessPoints){
       </div>
     </div>` : ''}
 
-    ${expState.editSalModal ? `
-    <div class="modal-overlay" id="edit-sal-overlay">
-      <div class="modal">
-        <div class="modal-head"><h3>✏️ Редактировать зарплату</h3><button class="close-btn" id="edit-sal-close">✕</button></div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-group"><label>Период</label><input type="month" class="form-control" id="edit-sal-period" value="${expState.editSalModal.period}"/></div>
-            <div class="form-group"><label>Сотрудник</label><input class="form-control" id="edit-sal-employee" value="${expState.editSalModal.employee}"/></div>
-            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="edit-sal-amount" value="${expState.editSalModal.amount}"/></div>
-          </div>
-        </div>
-        <div class="modal-foot">
-          <button class="btn btn-ghost" id="edit-sal-close">Отмена</button>
-          <button class="btn btn-primary" id="edit-sal-save">Сохранить</button>
-        </div>
-      </div>
-    </div>` : ''}
+
   `;
 }
 
@@ -864,11 +855,18 @@ function renderReport(accessPoints){
   const ptExp = isAll
     ? STATE.expenses.filter(e=>dates.includes(e.date)&&editable.some(p=>p.id===e.point_id))
     : STATE.expenses.filter(e=>e.point_id===reportState.pointId&&dates.includes(e.date));
-  const ptSal = isAll
-    ? STATE.salaries.filter(s=>editable.some(p=>p.id===s.point_id))
-    : STATE.salaries.filter(s=>s.point_id===reportState.pointId);
+  // Salary costs come from staff module (advances + payments)
+  // Load from Supabase synchronously via pre-loaded data
+  const ptStaffIds = (STATE.staffCache||[])
+    .filter(emp=>isAll ? editable.some(p=>p.id===emp.point_id) : emp.point_id===reportState.pointId)
+    .map(emp=>emp.id);
+  const ptAdvances = (STATE.advancesCache||[])
+    .filter(a=>ptStaffIds.includes(a.employee_id)&&dates.includes(a.date));
+  const ptSalPayments = (STATE.salPayCache||[])
+    .filter(p=>ptStaffIds.includes(p.employee_id)&&dates.includes(p.date));
+  const empMap = Object.fromEntries((STATE.staffCache||[]).map(e=>[e.id, e.name]));
   const totExp = ptExp.reduce((s,e)=>s+Number(e.amount||0),0);
-  const totSal = ptSal.reduce((s,e)=>s+Number(e.amount||0),0);
+  const totSal = [...ptAdvances,...ptSalPayments].reduce((s,e)=>s+Number(e.amount||0),0);
   const totCosts = totExp+totSal;
   const profit = totSold-totBought-totCosts+totRem;
   const marginPct = totSold>0 ? ((profit/totSold)*100).toFixed(1) : '0.0';
@@ -957,7 +955,8 @@ function renderReport(accessPoints){
 
   const expRows = [
     ...ptExp.map(e=>`<tr><td>${fmtDate(e.date)}</td><td><span class="badge badge-r">${e.type}</span></td><td class="num" style="color:var(--accent2);">${fmt(e.amount)}</td><td class="txt-cut" style="color:var(--text3);">${e.description||'—'}</td></tr>`),
-    ...ptSal.map(s=>`<tr><td>${(()=>{const p=s.period||"";const[y,m]=p.split("-");return m&&y?m+"."+y:p;})()}</td><td><span class="badge badge-r">Зарплата</span></td><td class="num" style="color:var(--accent2);">${fmt(s.amount)}</td><td class="txt-cut" style="color:var(--text3);">${s.employee}</td></tr>`),
+    ...ptAdvances.map(a=>`<tr><td>${fmtDate(a.date)}</td><td><span class="badge badge-r">Аванс</span></td><td class="num" style="color:var(--accent2);">${fmt(a.amount)}</td><td class="txt-cut" style="color:var(--text3);">${empMap[a.employee_id]||'—'}</td></tr>`),
+    ...ptSalPayments.map(p=>`<tr><td>${fmtDate(p.date)}</td><td><span class="badge badge-r">Зарплата</span></td><td class="num" style="color:var(--accent2);">${fmt(p.amount)}</td><td class="txt-cut" style="color:var(--text3);">${empMap[p.employee_id]||'—'}</td></tr>`),
   ].join('');
 
   // Store for export buttons
@@ -1384,55 +1383,7 @@ function bindEvents(accessPoints){
       await loadAll();
     });
   });
-  document.getElementById('add-sal-btn')?.addEventListener('click',()=>{expState.salModal={};render();});
-  document.getElementById('sal-modal-close')?.addEventListener('click',()=>{expState.salModal=null;render();});
-  document.getElementById('sal-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='sal-modal-overlay'){expState.salModal=null;render();}});
-  document.getElementById('sal-save-btn')?.addEventListener('click',async()=>{
-    const d={
-      period:document.getElementById('sal-period').value,
-      point_id:expState.pointId,
-      employee:document.getElementById('sal-employee').value,
-      amount:Number(document.getElementById('sal-amount').value)||0,
-      user_id:STATE.user.id
-    };
-    if(!d.employee||!d.amount){showAlert('error','Заполните все поля');return;}
-    const btn=document.getElementById('sal-save-btn');
-    btn.disabled=true;btn.textContent='Сохранение...';
-    const {error}=await sb.from('salaries').insert(d);
-    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
-    else{showAlert('success','Зарплата добавлена');expState.salModal=null;await loadAll();}
-  });
-  // Edit salary
-  document.querySelectorAll('[data-edit-sal]').forEach(el=>{
-    el.addEventListener('click',()=>{
-      try{ expState.editSalModal = JSON.parse(el.dataset.editSal); render(); }
-      catch(e){ showAlert('error','Ошибка'); }
-    });
-  });
-  document.getElementById('edit-sal-close')?.addEventListener('click',()=>{expState.editSalModal=null;render();});
-  document.getElementById('edit-sal-overlay')?.addEventListener('click',e=>{if(e.target.id==='edit-sal-overlay'){expState.editSalModal=null;render();}});
-  document.getElementById('edit-sal-save')?.addEventListener('click',async()=>{
-    const id = expState.editSalModal.id;
-    const d = {
-      period: document.getElementById('edit-sal-period').value,
-      employee: document.getElementById('edit-sal-employee').value,
-      amount: Number(document.getElementById('edit-sal-amount').value)||0,
-    };
-    if(!d.employee||!d.amount){showAlert('error','Заполните все поля');return;}
-    const btn = document.getElementById('edit-sal-save');
-    btn.disabled=true; btn.textContent='Сохранение...';
-    const {error} = await sb.from('salaries').update(d).eq('id',id);
-    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
-    else{showAlert('success','Зарплата обновлена');expState.editSalModal=null;await loadAll();}
-  });
-
-  document.querySelectorAll('[data-del-sal]').forEach(el=>{
-    el.addEventListener('click',async()=>{
-      if(!confirm('Удалить запись?')) return;
-      await sb.from('salaries').delete().eq('id',el.dataset.delSal);
-      await loadAll();
-    });
-  });
+  // Salary UI moved to Staff module
 
   // Bank
   document.getElementById('bank-file-input')?.addEventListener('change',async(e)=>{
