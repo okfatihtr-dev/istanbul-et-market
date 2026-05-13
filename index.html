@@ -236,7 +236,7 @@ function showAlert(type, msg){
 async function loadAll(){
   setState({dataLoaded:false});
   try{
-    const [e,ex,sal,bk,staff,adv,salPay] = await Promise.all([
+    const [e,ex,sal,bk,staff,adv,salPay,tgtsRaw] = await Promise.all([
       sb.from('daily_entries').select('*').order('date',{ascending:false}),
       sb.from('expenses').select('*').order('date',{ascending:false}),
       sb.from('salaries').select('*').order('created_at',{ascending:false}),
@@ -244,9 +244,15 @@ async function loadAll(){
       sb.from('staff').select('*'),
       sb.from('staff_advances').select('*'),
       sb.from('staff_salary_payments').select('*'),
+      sb.from('targets').select('*'),
     ]);
+    const tgts = {};
+    (tgtsRaw.data||[]).forEach(row=>{
+      if(!tgts[row.point_id]) tgts[row.point_id]={};
+      tgts[row.point_id][row.metric] = row.value;
+    });
     setState({entries:e.data||[], expenses:ex.data||[], salaries:sal.data||[], bankTx:bk.data||[],
-      staffCache:staff.data||[], advancesCache:adv.data||[], salPayCache:salPay.data||[],
+      staffCache:staff.data||[], advancesCache:adv.data||[], salPayCache:salPay.data||[], targets:tgts,
       dataLoaded:true});
   }catch(err){
     setState({dataLoaded:true});
@@ -2347,11 +2353,30 @@ function renderCariler(){
 
 
 // ─── TARGETS / BUDGET ────────────────────────────────────────────────────────
-function getTargets(){
-  try{ return JSON.parse(localStorage.getItem('uchet_targets')||'{}'); }
-  catch{ return {}; }
+// Targets stored in STATE for current session, synced to Supabase
+async function loadTargets(){
+  const {data} = await sb.from('targets').select('*');
+  const t = {};
+  (data||[]).forEach(row=>{
+    if(!t[row.point_id]) t[row.point_id]={};
+    t[row.point_id][row.metric] = row.value;
+  });
+  STATE.targets = t;
+  render();
 }
-function saveTargets(t){ localStorage.setItem('uchet_targets', JSON.stringify(t)); }
+function getTargets(){ return STATE.targets||{}; }
+async function saveTarget(pointId, metric, value){
+  const existing = await sb.from('targets').select('id').eq('point_id',pointId).eq('metric',metric).single();
+  if(existing.data){
+    await sb.from('targets').update({value:Number(value)}).eq('id',existing.data.id);
+  } else {
+    await sb.from('targets').insert({point_id:pointId, metric, value:Number(value)});
+  }
+  if(!STATE.targets) STATE.targets={};
+  if(!STATE.targets[pointId]) STATE.targets[pointId]={};
+  STATE.targets[pointId][metric] = value;
+  render();
+}
 
 function renderTargets(){
   const targets = getTargets();
@@ -2373,7 +2398,7 @@ function renderTargets(){
     const staffIds = (STATE.staffCache||[]).filter(emp=>emp.point_id===p.id).map(e=>e.id);
     const sal = [...(STATE.advancesCache||[]),...(STATE.salPayCache||[])].filter(x=>staffIds.includes(x.employee_id)&&x.date?.startsWith(curMonth)).reduce((s,e)=>s+Number(e.amount||0),0);
     const profit = sold-bought-exp-sal+rem;
-    const tgt = targets[p.id]||{};
+    const tgt = (STATE.targets||{})[p.id]||{};
     return {...p, sold, bought, rem, exp:exp+sal, profit,
       targetSales: Number(tgt.sales||0),
       targetProfit: Number(tgt.profit||0),
@@ -2444,13 +2469,13 @@ function renderTargets(){
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
             <div class="form-group" style="margin:0;"><label>Цель продаж ₸</label>
               <input type="number" class="form-control" placeholder="0" value="${p.targetSales||''}"
-                onchange="const t=getTargets();if(!t['${p.id}'])t['${p.id}']={};t['${p.id}'].sales=this.value;saveTargets(t);render();" style="font-size:12px;"/></div>
+                onchange="saveTarget('${p.id}','sales',this.value);" style="font-size:12px;"/></div>
             <div class="form-group" style="margin:0;"><label>Цель прибыли ₸</label>
               <input type="number" class="form-control" placeholder="0" value="${p.targetProfit||''}"
-                onchange="const t=getTargets();if(!t['${p.id}'])t['${p.id}']={};t['${p.id}'].profit=this.value;saveTargets(t);render();" style="font-size:12px;"/></div>
+                onchange="saveTarget('${p.id}','profit',this.value);" style="font-size:12px;"/></div>
             <div class="form-group" style="margin:0;"><label>Бюджет расходов ₸</label>
               <input type="number" class="form-control" placeholder="0" value="${p.targetExpense||''}"
-                onchange="const t=getTargets();if(!t['${p.id}'])t['${p.id}']={};t['${p.id}'].expense=this.value;saveTargets(t);render();" style="font-size:12px;"/></div>
+                onchange="saveTarget('${p.id}','expense',this.value);" style="font-size:12px;"/></div>
           </div>
         </div>
       </div>
@@ -2463,7 +2488,7 @@ function renderTargets(){
       <div class="stat-card"><div class="stat-label">Общая прибыль (${curMonth})</div><div class="stat-value ${totalProfit>=0?'g':'r'}">${fmt(totalProfit)}</div>${totalTgtProfit>0?`<div class="stat-sub">Цель: ${fmt(totalTgtProfit)}</div>`:''}</div>
       <div class="stat-card"><div class="stat-label">Точек с целями</div><div class="stat-value b">${ptData.filter(p=>p.targetSales>0).length} / ${editable.length}</div></div>
     </div>
-    <div class="alert alert-warn" style="margin-bottom:16px;">💡 Цели сохраняются локально на этом устройстве</div>
+    <div class="alert alert-success" style="margin-bottom:16px;">☁️ Цели сохраняются в облаке — доступны с любого устройства</div>
     ${ptCards}
   `;
 }
