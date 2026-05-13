@@ -1132,8 +1132,10 @@ function renderReport(accessPoints){
   };
 
   // Comparison data (current month vs previous month)
-  const curMonth = today().slice(0,7);
-  const prevMonth = new Date(new Date().getFullYear(), new Date().getMonth()-1, 1).toISOString().slice(0,7);
+  const now = new Date();
+  const curMonth  = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const prevDate  = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
   
   function getMonthData(month, ptIds){
     const mDates = STATE.entries.filter(e=>e.date.startsWith(month)).map(e=>e.date);
