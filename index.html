@@ -513,9 +513,51 @@ function renderEntry(accessPoints){
   const totPurch = dayE.reduce((s,e)=>s+Number(e.received||0),0);
   const totRem   = dayE.reduce((s,e)=>s+Number(e.remaining||0),0);
 
+  // 30-day summary for selected point
+  const last30 = getLast(30);
+  const ptE30 = STATE.entries.filter(e=>e.point_id===entryState.pointId&&last30.includes(e.date));
+  const sum30S = ptE30.reduce((s,e)=>s+Number(e.sold||0),0);
+  const sum30P = ptE30.reduce((s,e)=>s+Number(e.received||0),0);
+  const cats30 = CATS[entryState.pointId]||[];
+  const lastRem30 = cats30.reduce((total,cat)=>{
+    const last = ptE30.filter(e=>e.category===cat).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    return total+(last?Number(last.remaining||0):0);
+  },0);
+  const ptExp30 = STATE.expenses.filter(e=>e.point_id===entryState.pointId&&last30.includes(e.date)).reduce((s,e)=>s+Number(e.amount||0),0);
+  const ptStaffIds = (STATE.staffCache||[]).filter(emp=>emp.point_id===entryState.pointId).map(e=>e.id);
+  const ptSal30 = [...(STATE.advancesCache||[]),...(STATE.salPayCache||[])].filter(x=>ptStaffIds.includes(x.employee_id)&&last30.includes(x.date)).reduce((s,e)=>s+Number(e.amount||0),0);
+  const profit30 = sum30S - sum30P - ptExp30 - ptSal30 + lastRem30;
+
   const modalHtml = entryState.modal ? renderEntryModal() : '';
 
   return `
+    <div class="stats-grid" style="margin-bottom:16px;">
+      <div class="stat-card">
+        <div class="stat-label">Продажа (30 дней)</div>
+        <div class="stat-value y">${fmt(sum30S)}</div>
+        <div class="stat-sub">${POINTS.find(p=>p.id===entryState.pointId)?.name}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Закуп (30 дней)</div>
+        <div class="stat-value b">${fmt(sum30P)}</div>
+        <div class="stat-sub">поступления товара</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Остаток склада</div>
+        <div class="stat-value g">${fmt(lastRem30)}</div>
+        <div class="stat-sub">последние данные</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Расходы (30 дней)</div>
+        <div class="stat-value r">${fmt(ptExp30+ptSal30)}</div>
+        <div class="stat-sub">опер. + зарплаты</div>
+      </div>
+      <div class="stat-card" style="border-color:${profit30>=0?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)'};">
+        <div class="stat-label">Прибыль (30 дней)</div>
+        <div class="stat-value" style="color:${profit30>=0?'var(--accent3)':'var(--accent2)'};">${fmt(profit30)}</div>
+        <div class="stat-sub">Продажа−Закуп−Расх+Остаток</div>
+      </div>
+    </div>
     <div class="tabs">${tabsHtml}</div>
     <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:18px;flex-wrap:wrap;">
       <div class="form-group" style="margin:0;">
