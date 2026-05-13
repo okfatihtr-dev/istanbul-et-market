@@ -180,7 +180,7 @@ const CATS = {
   polf: ['Полфабрикат'],
   ofis: [],
 };
-const EXP_TYPES_DEFAULT = ['Аренда','Зарплата','Электричество','Транспорт','Коммунальные','Уборка','Упаковка','Ремонт','Прочее'];
+EXP_TYPES_DEFAULT = ['Аренда','Зарплата','Электричество','Транспорт','Коммунальные','Уборка','Упаковка','Ремонт','Прочее'];
 function getExpTypes(){
   try{ const s=localStorage.getItem('exp_types'); return s?JSON.parse(s):EXP_TYPES_DEFAULT; }
   catch{return EXP_TYPES_DEFAULT;}
@@ -588,8 +588,6 @@ function renderExpenses(accessPoints){
     return true;
   });
   const totExp = visExp.reduce((s,e)=>s+Number(e.amount||0),0);
-  const visSal = STATE.salaries.filter(s => s.point_id === selPoint);
-
   // Salary costs come from Staff module only
   const ptStaff = (STATE.staffCache||[]).filter(emp=>emp.point_id===selPoint).map(e=>e.id);
   const ptAdvances = (STATE.advancesCache||[]).filter(a=>ptStaff.includes(a.employee_id));
@@ -739,9 +737,8 @@ function renderExpenses(accessPoints){
     </div>
     <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:15%"><col style="width:20%"><col style="width:15%"><col style="width:32%"><col style="width:18%"></colgroup><thead><tr><th>Дата</th><th>Тип</th><th class="num">Сумма</th><th>Описание</th><th></th></tr></thead>
       <tbody>${expRows||'<tr><td colspan="5"><div class="empty">Нет расходов для этой точки</div></td></tr>'}</tbody>
-    </table></div>` :
-    `${expModal}${salModal}`}
-
+    </table></div>`:
+    ${expModal}${salModal}
 
     ${expState.editModal ? `
     <div class="modal-overlay" id="edit-exp-overlay">
@@ -772,13 +769,13 @@ function renderBank(){
   const totC = bk.reduce((s,t)=>s+Number(t.credit||0),0);
   const totD = bk.reduce((s,t)=>s+Number(t.debit||0),0);
   const rows = bk.map(t=>`<tr>
-    <td data-label="№" style="font-size:11px;color:var(--text3);">${t.doc_no||'—'}</td>
-    <td data-label="Дата" style="font-size:12px;white-space:nowrap;">${fmtDate(t.date)}</td>
-    <td data-label="Дебет" class="num" style="color:var(--accent2);font-weight:500;">${Number(t.debit)>0?fmt(t.debit):'—'}</td>
-    <td data-label="Кредит" class="num" style="color:var(--accent3);font-weight:500;">${Number(t.credit)>0?fmt(t.credit):'—'}</td>
-    <td style="font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.counterpart||''}">${t.counterpart||t.description||'—'}</td>
-    <td style="font-size:11px;color:var(--text2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.purpose||''}">${t.purpose||'—'}</td>
-    <td style="color:var(--text3);font-size:10px;">${t.source_file||''}</td>
+    <td class="txt-cut" style="font-size:11px;color:var(--text3);">${t.doc_no||'—'}</td>
+    <td style="font-size:12px;white-space:nowrap;">${fmtDate(t.date)}</td>
+    <td class="num" style="color:var(--accent2);font-weight:500;">${Number(t.debit)>0?fmt(t.debit):'—'}</td>
+    <td class="num" style="color:var(--accent3);font-weight:500;">${Number(t.credit)>0?fmt(t.credit):'—'}</td>
+    <td class="txt-cut" title="${t.counterpart||''}">${t.counterpart||'—'}</td>
+    <td class="txt-cut" style="color:var(--text2);" title="${t.purpose||''}">${t.purpose||'—'}</td>
+    <td class="txt-cut" style="color:var(--accent);font-size:11px;">${t.category||'—'}</td>
     <td>${t.approved?'<span class="badge badge-g">✓ Принято</span>':'<span class="badge badge-y">Ожидает</span>'}</td>
     <td style="display:flex;gap:4px;">
       ${!t.approved&&STATE.user.role==='admin'?`<button class="btn btn-success" style="padding:2px 7px;font-size:10px;" data-approve-tx="${t.id}">✓</button>`:''}
@@ -800,8 +797,8 @@ function renderBank(){
     </div>
     <div class="table-card"><div class="table-head"><h3>Банковские операции</h3></div>
     <div class="table-scroll" style="overflow-x:auto;"><table style="table-layout:fixed;min-width:800px;width:100%;">
-<colgroup><col style="width:8%"><col style="width:9%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:20%"><col style="width:8%"><col style="width:10%"><col style="width:9%"></colgroup>
-<thead><tr><th>№ Док.</th><th>Дата</th><th class="num">Дебет</th><th class="num">Кредит</th><th>Контрагент</th><th>Назначение</th><th>Файл</th><th>Статус</th><th></th></tr></thead>
+<colgroup><col style="width:11%"><col style="width:10%"><col style="width:12%"><col style="width:12%"><col style="width:17%"><col style="width:24%"><col style="width:9%"><col style="width:5%"></colgroup>
+<thead><tr><th>Фирма</th><th>Дата</th><th class="num">Дебет</th><th class="num">Кредит</th><th>Контрагент</th><th>Назначение платежа</th><th>Категория</th><th>Статус</th><th></th></tr></thead>
     <tbody>${rows||'<tr><td colspan="9"><div class="empty">Нет операций</div></td></tr>'}</tbody></table></div></div>
   `;
 }
@@ -864,7 +861,6 @@ function renderReport(accessPoints){
     .filter(a=>ptStaffIds.includes(a.employee_id)&&dates.includes(a.date));
   const ptSalPayments = (STATE.salPayCache||[])
     .filter(p=>ptStaffIds.includes(p.employee_id)&&dates.includes(p.date));
-  const empMap = Object.fromEntries((STATE.staffCache||[]).map(e=>[e.id, e.name]));
   const totExp = ptExp.reduce((s,e)=>s+Number(e.amount||0),0);
   const totSal = [...ptAdvances,...ptSalPayments].reduce((s,e)=>s+Number(e.amount||0),0);
   const totCosts = totExp+totSal;
@@ -1395,7 +1391,10 @@ function bindEvents(accessPoints){
         const ws=wb.Sheets[wb.SheetNames[0]];
         const rows=XLSX.utils.sheet_to_json(ws,{header:1});
         // Detect column positions from header row
-        const header = (rows[0]||[]).map(h=>String(h||'').toLowerCase());
+        // Format: A=Фирма, C=Дата операции, D=Дебет, E=Кредит,
+        //         F=Наименование/отправителя, K=Назначение платежа, M=Категория
+        const header = (rows[1]||rows[0]||[]).map(h=>String(h||'').toLowerCase().trim());
+
         const col = (keywords) => {
           for(const kw of keywords){
             const i = header.findIndex(h=>h.includes(kw));
@@ -1403,28 +1402,39 @@ function bindEvents(accessPoints){
           }
           return -1;
         };
-        const iDoc    = col(['документа','doc','№']);
-        const iDate   = col(['дата','date']);
+
+        const iFirma  = col(['фирма','firma','компания']);
+        const iDate   = col(['дата опера','дата','date']);
         const iDebit  = col(['дебет','debit']);
         const iCredit = col(['кредит','credit']);
-        const iName   = col(['наименование','бенефициар','отправител','name','контраген']);
-        const iPurp   = col(['назначение','платеж','purpose','описание']);
+        const iName   = col(['наименование','отправител','бенефициар','name']);
+        const iPurp   = col(['назначение','платеж','purpose']);
+        const iCat    = col(['категория','category']);
 
-        const newTx=rows.slice(1).filter(r=>r.some(c=>c)).map(r=>{
-          // Auto-detect if no header match: fallback to positional
-          const getVal = (idx, fallbackIdx) => idx>=0 ? r[idx] : r[fallbackIdx];
+        // Find start row (skip rows before header)
+        const headerRowIdx = rows.findIndex(r=>
+          r.some(cell=>String(cell||'').toLowerCase().includes('дата опер')||
+                       String(cell||'').toLowerCase().includes('дебет'))
+        );
+        const dataRows = rows.slice(headerRowIdx>=0 ? headerRowIdx+1 : 1);
+
+        const newTx = dataRows.filter(r=>r.some(c=>c)).map(r=>{
+          const getVal = (idx, fallback) => idx>=0 ? r[idx] : (fallback>=0 ? r[fallback] : '');
+          const debitRaw  = String(getVal(iDebit,  3)||'').replace(/[^0-9.,]/g,'').replace(',','.');
+          const creditRaw = String(getVal(iCredit, 4)||'').replace(/[^0-9.,]/g,'').replace(',','.');
           return {
-            doc_no:      String(getVal(iDoc, 0)||''),
-            date:        String(getVal(iDate, 1)||''),
-            debit:       Number(String(getVal(iDebit, 2)||'').replace(/[^0-9.]/g,''))||0,
-            credit:      Number(String(getVal(iCredit, 3)||'').replace(/[^0-9.]/g,''))||0,
-            counterpart: String(getVal(iName, 4)||''),
-            purpose:     String(getVal(iPurp, 9)||''),
-            description: String(getVal(iName, 4)||''),
+            doc_no:      String(getVal(iFirma, 0)||''),
+            date:        String(getVal(iDate,  2)||''),
+            debit:       parseFloat(debitRaw)||0,
+            credit:      parseFloat(creditRaw)||0,
+            counterpart: String(getVal(iName,  5)||''),
+            purpose:     String(getVal(iPurp, 10)||''),
+            category:    String(getVal(iCat,  12)||''),
+            description: String(getVal(iName,  5)||''),
             source_file: file.name,
             approved:    false,
           };
-        }).filter(r=>r.date||r.debit||r.credit);
+        }).filter(r=>r.date&&(r.debit||r.credit));
         if(!newTx.length){showAlert('error','Нет данных в файле');return;}
         const {error}=await sb.from('bank_transactions').insert(newTx);
         if(error){showAlert('error',error.message);}else{showAlert('success',`Загружено ${newTx.length} операций`);await loadAll();}
