@@ -1389,10 +1389,20 @@ function bindEvents(accessPoints){
         const wb=XLSX.read(ev.target.result,{type:'array'});
         const ws=wb.Sheets[wb.SheetNames[0]];
         const rows=XLSX.utils.sheet_to_json(ws,{header:1});
-        // Detect column positions from header row
-        // Format: A=Фирма, C=Дата операции, D=Дебет, E=Кредит,
-        //         F=Наименование/отправителя, K=Назначение платежа, M=Категория
-        const header = (rows[1]||rows[0]||[]).map(h=>String(h||'').toLowerCase().trim());
+        // Parse bank Excel file
+        // Find header row automatically
+        let headerRowIdx = -1;
+        for(let i=0;i<Math.min(rows.length,10);i++){
+          const row = rows[i]||[];
+          const rowStr = row.map(c=>String(c||'').toLowerCase()).join('|');
+          if(rowStr.includes('дебет')||rowStr.includes('кредит')||rowStr.includes('дата опер')){
+            headerRowIdx = i;
+            break;
+          }
+        }
+        if(headerRowIdx<0) headerRowIdx=1; // fallback to row 2
+
+        const header = (rows[headerRowIdx]||[]).map(h=>String(h||'').toLowerCase().trim());
 
         const col = (keywords) => {
           for(const kw of keywords){
@@ -1403,29 +1413,31 @@ function bindEvents(accessPoints){
         };
 
         const iFirma  = col(['фирма','firma','компания']);
-        const iDate   = col(['дата опера','дата','date']);
+        const iDate   = col(['дата опера','дата опер','дата','date']);
         const iDebit  = col(['дебет','debit']);
         const iCredit = col(['кредит','credit']);
-        const iName   = col(['наименование','отправител','бенефициар','name']);
+        const iName   = col(['наименование','отправител','бенефициар']);
         const iPurp   = col(['назначение','платеж','purpose']);
         const iCat    = col(['категория','category']);
 
-        // Find start row (skip rows before header)
-        const headerRowIdx = rows.findIndex(r=>
-          r.some(cell=>String(cell||'').toLowerCase().includes('дата опер')||
-                       String(cell||'').toLowerCase().includes('дебет'))
-        );
-        const dataRows = rows.slice(headerRowIdx>=0 ? headerRowIdx+1 : 1);
+        const dataRows = rows.slice(headerRowIdx+1);
 
-        const newTx = dataRows.filter(r=>r.some(c=>c)).map(r=>{
-          const getVal = (idx, fallback) => idx>=0 ? r[idx] : (fallback>=0 ? r[fallback] : '');
-          const debitRaw  = String(getVal(iDebit,  3)||'').replace(/[^0-9.,]/g,'').replace(',','.');
-          const creditRaw = String(getVal(iCredit, 4)||'').replace(/[^0-9.,]/g,'').replace(',','.');
+        const newTx = dataRows.filter(r=>Array.isArray(r)&&r.some(c=>c!=null&&c!=='')).map(r=>{
+          const getVal = (idx, fallback) => {
+            if(idx>=0 && idx<r.length) return r[idx];
+            if(fallback>=0 && fallback<r.length) return r[fallback];
+            return '';
+          };
+          const debitRaw  = String(getVal(iDebit,  3)||'').replace(/\s/g,'').replace(',','.').replace(/[^0-9.]/g,'');
+          const creditRaw = String(getVal(iCredit, 4)||'').replace(/\s/g,'').replace(',','.').replace(/[^0-9.]/g,'');
+          const debit  = parseFloat(debitRaw)||0;
+          const credit = parseFloat(creditRaw)||0;
+          if(!debit && !credit) return null;
           return {
             doc_no:      String(getVal(iFirma, 0)||''),
             date:        String(getVal(iDate,  2)||''),
-            debit:       parseFloat(debitRaw)||0,
-            credit:      parseFloat(creditRaw)||0,
+            debit,
+            credit,
             counterpart: String(getVal(iName,  5)||''),
             purpose:     String(getVal(iPurp, 10)||''),
             category:    String(getVal(iCat,  12)||''),
@@ -1433,7 +1445,7 @@ function bindEvents(accessPoints){
             source_file: file.name,
             approved:    false,
           };
-        }).filter(r=>r.date&&(r.debit||r.credit));
+        }).filter(r=>r!==null);
         if(!newTx.length){showAlert('error','Нет данных в файле');return;}
         const {error}=await sb.from('bank_transactions').insert(newTx);
         if(error){showAlert('error',error.message);}else{showAlert('success',`Загружено ${newTx.length} операций`);await loadAll();}
