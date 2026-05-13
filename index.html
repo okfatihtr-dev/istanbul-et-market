@@ -622,17 +622,7 @@ function renderExpenses(accessPoints){
     </td>
   </tr>`).join('');
 
-  const salRows = visSal.map(s=>`<tr>
-    <td class="txt-cut">${(()=>{const p=s.period||"";const[y,m]=p.split("-");return m&&y?m+"."+y:p;})()}</td>
-    <td class="txt-cut">${s.employee}</td>
-    <td class="num" style="color:var(--accent2);font-weight:500;">${fmt(s.amount)}</td>
-    <td>
-      <div class="actions-cell">
-        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10px;" data-edit-sal='${JSON.stringify({id:s.id,period:s.period,employee:s.employee,amount:s.amount})}'>✏️</button>
-        ${STATE.user.role==='admin'?`<button class="btn btn-danger" style="padding:3px 8px;font-size:10px;" data-del-sal="${s.id}">✕</button>`:''}
-      </div>
-    </td>
-  </tr>`).join('');
+  const salRows = ''; // moved to staff module
 
   const expModal = expState.modal ? `
     <div class="modal-overlay" id="exp-modal-overlay">
