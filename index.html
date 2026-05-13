@@ -188,7 +188,7 @@ function getExpTypes(){
 function saveExpTypes(arr){
   localStorage.setItem('exp_types', JSON.stringify(arr));
 }
-const PAGE_TITLES = {dashboard:'Главная панель',entry:'Ввод данных',expenses:'Расходы / Зарплаты',bank:'Банк (Офис)',report:'Отчёт',users:'Пользователи',profile:'Мой профиль',staff:'Персонал / Зарплаты',cariler:'Карточки должников'};
+const PAGE_TITLES = {dashboard:'Главная панель',entry:'Ввод данных',expenses:'Расходы / Зарплаты',bank:'Банк (Офис)',report:'Отчёт',users:'Пользователи',profile:'Мой профиль',staff:'Персонал / Зарплаты',cariler:'Карточки должников',targets:'Цели / Бюджет'};
 
 function fmt(n){if(!n&&n!==0)return '—';return Number(n).toLocaleString('ru-KZ')+'₸';}
 function fmtDate(d){
@@ -363,6 +363,7 @@ function renderSidebar(accessPoints){
     {id:'report',icon:'📈',label:'Отчёт'},
     ...(STATE.user.role==='admin'?[{id:'users',icon:'👥',label:'Пользователи'}]:[]),
     ...(STATE.user.role==='admin'?[{id:'staff',icon:'💼',label:'Персонал / Зарплаты'}]:[]),
+    ...(STATE.user.role==='admin'?[{id:'targets',icon:'🎯',label:'Цели / Бюджет'}]:[]),
     ...(['admin','operator'].includes(STATE.user.role)&&['mkr17','mkr5','baza',null].includes(STATE.user.point_id)?[{id:'cariler',icon:'📒',label:'Карточки должников'}]:[]),
     {id:'profile',icon:'👤',label:'Мой профиль'},
   ];
@@ -426,6 +427,7 @@ function renderPage(accessPoints){
     case 'profile':   return renderProfile();
     case 'staff':     return STATE.user.role==='admin' ? renderStaff() : '';
     case 'cariler':   return renderCariler();
+    case 'targets':   return STATE.user.role==='admin' ? renderTargets() : '';
     default: return '';
   }
 }
@@ -2340,6 +2342,129 @@ function renderCariler(){
     </div>
     ${debtorCards}
     ${newModal}${payModal}
+  `;
+}
+
+
+// ─── TARGETS / BUDGET ────────────────────────────────────────────────────────
+function getTargets(){
+  try{ return JSON.parse(localStorage.getItem('uchet_targets')||'{}'); }
+  catch{ return {}; }
+}
+function saveTargets(t){ localStorage.setItem('uchet_targets', JSON.stringify(t)); }
+
+function renderTargets(){
+  const targets = getTargets();
+  const now = new Date();
+  const curMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const editable = POINTS.filter(p=>p.id!=='ofis');
+
+  // Current month actuals per point
+  const ptData = editable.map(p=>{
+    const mEntries = STATE.entries.filter(e=>e.point_id===p.id&&e.date.startsWith(curMonth));
+    const sold = mEntries.reduce((s,e)=>s+Number(e.sold||0),0);
+    const bought = mEntries.reduce((s,e)=>s+Number(e.received||0),0);
+    const cats = CATS[p.id]||[];
+    const rem = cats.reduce((total,cat)=>{
+      const last = mEntries.filter(e=>e.category===cat).sort((a,b)=>b.date.localeCompare(a.date))[0];
+      return total+(last?Number(last.remaining||0):0);
+    },0);
+    const exp = STATE.expenses.filter(e=>e.point_id===p.id&&e.date.startsWith(curMonth)).reduce((s,e)=>s+Number(e.amount||0),0);
+    const staffIds = (STATE.staffCache||[]).filter(emp=>emp.point_id===p.id).map(e=>e.id);
+    const sal = [...(STATE.advancesCache||[]),...(STATE.salPayCache||[])].filter(x=>staffIds.includes(x.employee_id)&&x.date?.startsWith(curMonth)).reduce((s,e)=>s+Number(e.amount||0),0);
+    const profit = sold-bought-exp-sal+rem;
+    const tgt = targets[p.id]||{};
+    return {...p, sold, bought, rem, exp:exp+sal, profit,
+      targetSales: Number(tgt.sales||0),
+      targetProfit: Number(tgt.profit||0),
+      targetExpense: Number(tgt.expense||0)};
+  });
+
+  const totalSales   = ptData.reduce((s,p)=>s+p.sold,0);
+  const totalProfit  = ptData.reduce((s,p)=>s+p.profit,0);
+  const totalTgtSales = ptData.reduce((s,p)=>s+p.targetSales,0);
+  const totalTgtProfit = ptData.reduce((s,p)=>s+p.targetProfit,0);
+
+  const ptCards = ptData.map(p=>{
+    const salesPct  = p.targetSales>0  ? Math.min((p.sold/p.targetSales)*100,100).toFixed(0)   : null;
+    const profitPct = p.targetProfit>0 ? Math.min((p.profit/p.targetProfit)*100,100).toFixed(0) : null;
+    const expPct    = p.targetExpense>0 ? Math.min((p.exp/p.targetExpense)*100,100).toFixed(0)  : null;
+    const salesColor = salesPct>=100?'var(--accent3)':salesPct>=70?'var(--accent)':'var(--accent2)';
+    return `
+    <div class="table-card" style="margin-bottom:14px;">
+      <div class="table-head">
+        <h3>📍 ${p.name}</h3>
+        <span style="font-size:11px;color:var(--text3);">${curMonth}</span>
+      </div>
+      <div style="padding:16px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
+
+          <div class="stat-card" style="padding:14px;">
+            <div class="stat-label">Продажа / Цель</div>
+            <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0;">
+              <span style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:var(--accent);">${fmt(p.sold)}</span>
+              ${p.targetSales>0?`<span style="font-size:11px;color:var(--text3);">/ ${fmt(p.targetSales)}</span>`:''}
+            </div>
+            ${salesPct!==null?`
+            <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:4px;">
+              <div style="height:100%;width:${salesPct}%;background:${salesColor};border-radius:3px;transition:width .6s;"></div>
+            </div>
+            <span style="font-size:11px;color:${salesColor};font-weight:600;">${salesPct}% выполнено</span>`:'<span style="font-size:11px;color:var(--text3);">Цель не задана</span>'}
+          </div>
+
+          <div class="stat-card" style="padding:14px;border-color:${p.profit>=0?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'};">
+            <div class="stat-label">Прибыль / Цель</div>
+            <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0;">
+              <span style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:${p.profit>=0?'var(--accent3)':'var(--accent2)'};">${fmt(p.profit)}</span>
+              ${p.targetProfit>0?`<span style="font-size:11px;color:var(--text3);">/ ${fmt(p.targetProfit)}</span>`:''}
+            </div>
+            ${profitPct!==null?`
+            <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:4px;">
+              <div style="height:100%;width:${profitPct}%;background:${Number(profitPct)>=100?'var(--accent3)':Number(profitPct)>=70?'var(--accent)':'var(--accent2)'};border-radius:3px;"></div>
+            </div>
+            <span style="font-size:11px;color:var(--text3);font-weight:600;">${profitPct}% выполнено</span>`:'<span style="font-size:11px;color:var(--text3);">Цель не задана</span>'}
+          </div>
+
+          <div class="stat-card" style="padding:14px;">
+            <div class="stat-label">Расходы / Бюджет</div>
+            <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0;">
+              <span style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:var(--accent2);">${fmt(p.exp)}</span>
+              ${p.targetExpense>0?`<span style="font-size:11px;color:var(--text3);">/ ${fmt(p.targetExpense)}</span>`:''}
+            </div>
+            ${expPct!==null?`
+            <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:4px;">
+              <div style="height:100%;width:${expPct}%;background:${Number(expPct)>=100?'var(--accent2)':Number(expPct)>=80?'var(--accent)':'var(--accent3)'};border-radius:3px;"></div>
+            </div>
+            <span style="font-size:11px;color:var(--text3);font-weight:600;">${expPct}% использовано</span>`:'<span style="font-size:11px;color:var(--text3);">Бюджет не задан</span>'}
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);padding-top:12px;">
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">Установить цели на месяц</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div class="form-group" style="margin:0;"><label>Цель продаж ₸</label>
+              <input type="number" class="form-control" placeholder="0" value="${p.targetSales||''}"
+                onchange="const t=getTargets();if(!t['${p.id}'])t['${p.id}']={};t['${p.id}'].sales=this.value;saveTargets(t);render();" style="font-size:12px;"/></div>
+            <div class="form-group" style="margin:0;"><label>Цель прибыли ₸</label>
+              <input type="number" class="form-control" placeholder="0" value="${p.targetProfit||''}"
+                onchange="const t=getTargets();if(!t['${p.id}'])t['${p.id}']={};t['${p.id}'].profit=this.value;saveTargets(t);render();" style="font-size:12px;"/></div>
+            <div class="form-group" style="margin:0;"><label>Бюджет расходов ₸</label>
+              <input type="number" class="form-control" placeholder="0" value="${p.targetExpense||''}"
+                onchange="const t=getTargets();if(!t['${p.id}'])t['${p.id}']={};t['${p.id}'].expense=this.value;saveTargets(t);render();" style="font-size:12px;"/></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="stats-grid" style="margin-bottom:20px;">
+      <div class="stat-card"><div class="stat-label">Общие продажи (${curMonth})</div><div class="stat-value y">${fmt(totalSales)}</div>${totalTgtSales>0?`<div class="stat-sub">Цель: ${fmt(totalTgtSales)}</div>`:''}</div>
+      <div class="stat-card"><div class="stat-label">Общая прибыль (${curMonth})</div><div class="stat-value ${totalProfit>=0?'g':'r'}">${fmt(totalProfit)}</div>${totalTgtProfit>0?`<div class="stat-sub">Цель: ${fmt(totalTgtProfit)}</div>`:''}</div>
+      <div class="stat-card"><div class="stat-label">Точек с целями</div><div class="stat-value b">${ptData.filter(p=>p.targetSales>0).length} / ${editable.length}</div></div>
+    </div>
+    <div class="alert alert-warn" style="margin-bottom:16px;">💡 Цели сохраняются локально на этом устройстве</div>
+    ${ptCards}
   `;
 }
 
