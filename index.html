@@ -435,6 +435,21 @@ function renderDashboard(accessPoints){
   const tod = today();
   const todE = STATE.entries.filter(e=>e.date===tod);
   const todEx = STATE.expenses.filter(e=>e.date===tod);
+
+  // Check which points haven't entered data today
+  const editablePts = accessPoints.filter(p=>p.id!=='ofis');
+  const missingData = editablePts.filter(p=>{
+    const ptCats = CATS[p.id]||[];
+    if(ptCats.length===0) return false;
+    const ptEntries = todE.filter(e=>e.point_id===p.id);
+    return ptEntries.length===0; // No data at all today
+  });
+  const partialData = editablePts.filter(p=>{
+    const ptCats = CATS[p.id]||[];
+    if(ptCats.length===0) return false;
+    const ptEntries = todE.filter(e=>e.point_id===p.id);
+    return ptEntries.length>0 && ptEntries.length<ptCats.length;
+  });
   const totSales = todE.reduce((s,e)=>s+Number(e.sold||0),0);
   const totPurch = todE.reduce((s,e)=>s+Number(e.received||0),0);
   const totRem   = todE.reduce((s,e)=>s+Number(e.remaining||0),0);
@@ -453,6 +468,29 @@ function renderDashboard(accessPoints){
   }).join('');
 
   return `
+    ${missingData.length>0||partialData.length>0?`
+    <div style="margin-bottom:16px;">
+      ${missingData.length>0?`
+      <div class="alert alert-error" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <span style="font-size:18px;">⚠️</span>
+        <div>
+          <b>Данные не введены сегодня:</b>
+          ${missingData.map(p=>`<span class="badge badge-r" style="margin-left:6px;">${p.name}</span>`).join('')}
+        </div>
+      </div>`:''}
+      ${partialData.length>0?`
+      <div class="alert alert-warn" style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:18px;">📝</span>
+        <div>
+          <b>Введены не все категории:</b>
+          ${partialData.map(p=>{
+            const entered = todE.filter(e=>e.point_id===p.id).length;
+            const total = (CATS[p.id]||[]).length;
+            return `<span class="badge badge-y" style="margin-left:6px;">${p.name} (${entered}/${total})</span>`;
+          }).join('')}
+        </div>
+      </div>`:''}
+    </div>`:''}
     <div class="section-title">Сегодня — ${fmtDate(tod)}</div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Продажи</div><div class="stat-value y">${fmt(totSales)}</div><div class="stat-sub">все точки</div></div>
@@ -488,7 +526,7 @@ function renderDashboard(accessPoints){
 }
 
 // ─── ENTRY PAGE ──────────────────────────────────────────────────────────────
-let entryState = {pointId:'', date:today(), saving:false, modal:null};
+let entryState = {pointId:'', date:today(), saving:false, modal:null, bulkMode:false, bulkData:{}};
 
 function renderEntry(accessPoints){
   const editable = accessPoints.filter(p=>p.id!=='ofis');
@@ -531,6 +569,13 @@ function renderEntry(accessPoints){
   const modalHtml = entryState.modal ? renderEntryModal() : '';
 
   return `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+      <button class="btn ${entryState.bulkMode?'btn-primary':'btn-ghost'}" 
+        onclick="entryState.bulkMode=!entryState.bulkMode;if(!entryState.bulkMode)entryState.bulkData={};render();"
+        style="font-size:12px;">
+        ${entryState.bulkMode?'✕ Отмена':'⚡ Быстрый ввод (все категории)'}
+      </button>
+    </div>
     <div class="stats-grid" style="margin-bottom:16px;">
       <div class="stat-card">
         <div class="stat-label">Продажа (30 дней)</div>
@@ -566,11 +611,41 @@ function renderEntry(accessPoints){
       </div>
       <span style="font-size:12px;color:var(--text3);margin-bottom:2px;">Введено: ${dayE.length} из ${cats.length}</span>
     </div>
+    ${entryState.bulkMode?`
+    <div class="table-card" style="padding:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h3 style="font-family:'Unbounded',sans-serif;font-size:12px;">⚡ Быстрый ввод — ${POINTS.find(p=>p.id===entryState.pointId)?.name}</h3>
+      </div>
+      <div style="display:grid;gap:10px;">
+        ${cats.map(cat=>{
+          const e=dayE.find(x=>x.category===cat);
+          const bd=entryState.bulkData[cat]||{};
+          return `<div style="background:var(--bg3);border-radius:10px;padding:12px;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:8px;">${cat} ${e?'<span class="badge badge-g">✓</span>':''}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              <div class="form-group" style="margin:0;"><label>Закуп</label>
+                <input type="number" class="form-control" value="${bd.received!==undefined?bd.received:e?e.received:''}" placeholder="${e?e.received:'0'}"
+                  oninput="if(!entryState.bulkData['${cat}'])entryState.bulkData['${cat}']={};entryState.bulkData['${cat}'].received=this.value;"/></div>
+              <div class="form-group" style="margin:0;"><label>Продажа</label>
+                <input type="number" class="form-control" value="${bd.sold!==undefined?bd.sold:e?e.sold:''}" placeholder="${e?e.sold:'0'}"
+                  oninput="if(!entryState.bulkData['${cat}'])entryState.bulkData['${cat}']={};entryState.bulkData['${cat}'].sold=this.value;"/></div>
+              <div class="form-group" style="margin:0;"><label>Остаток</label>
+                <input type="number" class="form-control" value="${bd.remaining!==undefined?bd.remaining:e?e.remaining:''}" placeholder="${e?e.remaining:'0'}"
+                  oninput="if(!entryState.bulkData['${cat}'])entryState.bulkData['${cat}']={};entryState.bulkData['${cat}'].remaining=this.value;"/></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="entryState.bulkMode=false;entryState.bulkData={};render();">Отмена</button>
+        <button class="btn btn-primary" id="bulk-save-btn" style="padding:10px 24px;">💾 Сохранить всё</button>
+      </div>
+    </div>`:`
     <div class="table-card">
       <div class="table-head"><h3>${POINTS.find(p=>p.id===entryState.pointId)?.name} — ${fmtDate(entryState.date)}</h3><span style="font-size:11px;color:var(--text3);">Нажмите строку</span></div>
       <table style="table-layout:fixed;width:100%;"><colgroup><col style="width:32%"><col style="width:17%"><col style="width:17%"><col style="width:17%"><col style="width:17%"></colgroup><thead><tr><th>Категория</th><th class="num">Закуп</th><th class="num">Продажа</th><th class="num">Остаток</th><th>Статус</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="5"><div class="empty">Нет категорий</div></td></tr>'}</tbody></table>
-    </div>
+    </div>`}
     ${dayE.length>0?`
     <div class="stats-grid" style="margin-top:14px;">
       <div class="stat-card"><div class="stat-label">Продажа</div><div class="stat-value y">${fmt(totSales)}</div></div>
@@ -1339,6 +1414,43 @@ function bindEvents(accessPoints){
   // Nav
   document.querySelectorAll('[data-page]').forEach(el=>{
     el.addEventListener('click',()=>setState({page:el.dataset.page}));
+  });
+
+  // Bulk save
+  document.getElementById('bulk-save-btn')?.addEventListener('click', async()=>{
+    const cats = CATS[entryState.pointId]||[];
+    const toSave = cats.filter(cat=>entryState.bulkData[cat]&&
+      Object.values(entryState.bulkData[cat]).some(v=>v!==''));
+    if(toSave.length===0){showAlert('error','Нет данных для сохранения');return;}
+    const btn=document.getElementById('bulk-save-btn');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    let saved=0, errors=0;
+    for(const cat of toSave){
+      const bd = entryState.bulkData[cat];
+      const existing = STATE.entries.find(e=>e.point_id===entryState.pointId&&e.date===entryState.date&&e.category===cat);
+      const data = {
+        point_id:entryState.pointId, date:entryState.date, category:cat,
+        received:Number(bd.received||existing?.received||0),
+        sold:Number(bd.sold||existing?.sold||0),
+        remaining:Number(bd.remaining||existing?.remaining||0),
+        user_id:STATE.user.id
+      };
+      let err;
+      if(existing){
+        const r=await sb.from('daily_entries').update({received:data.received,sold:data.sold,remaining:data.remaining,updated_at:new Date().toISOString()}).eq('id',existing.id);
+        err=r.error;
+      } else {
+        const r=await sb.from('daily_entries').insert(data);
+        err=r.error;
+      }
+      if(err) errors++;
+      else saved++;
+    }
+    if(errors>0) showAlert('error',`Ошибок: ${errors}, сохранено: ${saved}`);
+    else showAlert('success',`Сохранено ${saved} категорий!`);
+    entryState.bulkMode=false;
+    entryState.bulkData={};
+    await loadAll();
   });
 
   // Entry page
