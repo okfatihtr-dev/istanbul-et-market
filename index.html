@@ -974,7 +974,7 @@ function renderBank(){
 }
 
 // ─── REPORT ──────────────────────────────────────────────────────────────────
-let reportState = {pointId:'', days:'15'};
+let reportState = {pointId:'', days:'15', tab:'report'}; // tab: report | compare
 
 function renderReport(accessPoints){
   const editable = accessPoints.filter(p=>p.id!=='ofis');
@@ -1131,7 +1131,103 @@ function renderReport(accessPoints){
     pointSummary:pointSummary.map(x=>({name:x.p.name,pS:x.pS,pR:x.pR,pRem:x.pRem,pCosts:x.pCosts,pProfit:x.pProfit,pMargin:x.pMargin}))
   };
 
+  // Comparison data (current month vs previous month)
+  const curMonth = today().slice(0,7);
+  const prevMonth = new Date(new Date().getFullYear(), new Date().getMonth()-1, 1).toISOString().slice(0,7);
+  
+  function getMonthData(month, ptIds){
+    const mDates = STATE.entries.filter(e=>e.date.startsWith(month)).map(e=>e.date);
+    const uniq = [...new Set(mDates)];
+    const mEntries = STATE.entries.filter(e=>ptIds.includes(e.point_id)&&e.date.startsWith(month));
+    const mExp = STATE.expenses.filter(e=>ptIds.includes(e.point_id)&&e.date.startsWith(month));
+    const mStaffIds = (STATE.staffCache||[]).filter(emp=>ptIds.includes(emp.point_id)).map(e=>e.id);
+    const mSal = [...(STATE.advancesCache||[]),...(STATE.salPayCache||[])]
+      .filter(x=>mStaffIds.includes(x.employee_id)&&x.date?.startsWith(month));
+    const sold = mEntries.reduce((s,e)=>s+Number(e.sold||0),0);
+    const bought = mEntries.reduce((s,e)=>s+Number(e.received||0),0);
+    const allCatsM = [...new Set(activePts.flatMap(p=>CATS[p.id]||[]))];
+    const rem = allCatsM.reduce((total,cat)=>{
+      const last = mEntries.filter(e=>e.category===cat).sort((a,b)=>b.date.localeCompare(a.date))[0];
+      return total+(last?Number(last.remaining||0):0);
+    },0);
+    const exp = mExp.reduce((s,e)=>s+Number(e.amount||0),0);
+    const sal = mSal.reduce((s,e)=>s+Number(e.amount||0),0);
+    const profit = sold-bought-(exp+sal)+rem;
+    return {sold,bought,rem,exp:exp+sal,profit, days:uniq.length};
+  }
+
+  const ptIds = activePts.map(p=>p.id);
+  const curData  = getMonthData(curMonth,  ptIds);
+  const prevData = getMonthData(prevMonth, ptIds);
+
+  function diff(cur,prev){
+    if(!prev) return null;
+    const pct = ((cur-prev)/Math.abs(prev||1)*100).toFixed(1);
+    const up = cur>=prev;
+    return `<span style="font-size:11px;color:${up?'var(--accent3)':'var(--accent2)'};">
+      ${up?'▲':'▼'} ${Math.abs(pct)}%
+    </span>`;
+  }
+
   return `
+    <div class="tabs" style="margin-bottom:16px;">
+      <div class="tab ${reportState.tab==='report'?'active':''}" onclick="reportState.tab='report';render();">📊 Отчёт</div>
+      <div class="tab ${reportState.tab==='compare'?'active':''}" onclick="reportState.tab='compare';render();">📈 Сравнение месяцев</div>
+    </div>
+
+    ${reportState.tab==='compare'?`
+    <div class="section-title">Сравнение: ${curMonth} vs ${prevMonth}</div>
+    <div class="table-card" style="margin-bottom:16px;">
+      <div class="table-scroll"><table style="table-layout:fixed;width:100%;">
+        <colgroup><col style="width:22%"><col style="width:19%"><col style="width:19%"><col style="width:16%"><col style="width:24%"></colgroup>
+        <thead><tr><th>Показатель</th><th class="num">${prevMonth}</th><th class="num">${curMonth}</th><th class="num">Изм.</th><th class="num">Тренд</th></tr></thead>
+        <tbody>
+          <tr><td><b>Продажа</b></td><td class="num" style="color:var(--accent);">${fmt(prevData.sold)}</td><td class="num" style="color:var(--accent);">${fmt(curData.sold)}</td><td class="num">${fmt(curData.sold-prevData.sold)}</td><td class="num">${diff(curData.sold,prevData.sold)||'—'}</td></tr>
+          <tr><td><b>Закуп</b></td><td class="num" style="color:#60a5fa;">${fmt(prevData.bought)}</td><td class="num" style="color:#60a5fa;">${fmt(curData.bought)}</td><td class="num">${fmt(curData.bought-prevData.bought)}</td><td class="num">${diff(curData.bought,prevData.bought)||'—'}</td></tr>
+          <tr><td><b>Остаток</b></td><td class="num" style="color:var(--accent3);">${fmt(prevData.rem)}</td><td class="num" style="color:var(--accent3);">${fmt(curData.rem)}</td><td class="num">${fmt(curData.rem-prevData.rem)}</td><td class="num">${diff(curData.rem,prevData.rem)||'—'}</td></tr>
+          <tr><td><b>Расходы</b></td><td class="num" style="color:var(--accent2);">${fmt(prevData.exp)}</td><td class="num" style="color:var(--accent2);">${fmt(curData.exp)}</td><td class="num">${fmt(curData.exp-prevData.exp)}</td><td class="num">${diff(curData.exp,prevData.exp)||'—'}</td></tr>
+          <tr style="background:var(--bg3);font-weight:700;"><td><b>Прибыль</b></td>
+            <td class="num" style="color:${prevData.profit>=0?'var(--accent3)':'var(--accent2)'};">${fmt(prevData.profit)}</td>
+            <td class="num" style="color:${curData.profit>=0?'var(--accent3)':'var(--accent2)'};">${fmt(curData.profit)}</td>
+            <td class="num">${fmt(curData.profit-prevData.profit)}</td>
+            <td class="num">${diff(curData.profit,prevData.profit)||'—'}</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    ${isAll?`
+    <div class="section-title">По точкам — сравнение</div>
+    ${editable.map(p=>{
+      const cur  = getMonthData(curMonth,  [p.id]);
+      const prev = getMonthData(prevMonth, [p.id]);
+      return `<div class="table-card" style="margin-bottom:12px;">
+        <div class="table-head"><h3>📍 ${p.name}</h3></div>
+        <div style="padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
+          <div class="stat-card" style="padding:12px;">
+            <div class="stat-label">Продажа</div>
+            <div style="font-size:12px;color:var(--text2);">${prevMonth}: ${fmt(prev.sold)}</div>
+            <div style="font-size:15px;font-weight:700;color:var(--accent);">${fmt(cur.sold)}</div>
+            <div>${diff(cur.sold,prev.sold)||'—'}</div>
+          </div>
+          <div class="stat-card" style="padding:12px;">
+            <div class="stat-label">Расходы</div>
+            <div style="font-size:12px;color:var(--text2);">${prevMonth}: ${fmt(prev.exp)}</div>
+            <div style="font-size:15px;font-weight:700;color:var(--accent2);">${fmt(cur.exp)}</div>
+            <div>${diff(cur.exp,prev.exp)||'—'}</div>
+          </div>
+          <div class="stat-card" style="padding:12px;border-color:${cur.profit>=0?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)'};">
+            <div class="stat-label">Прибыль</div>
+            <div style="font-size:12px;color:var(--text2);">${prevMonth}: ${fmt(prev.profit)}</div>
+            <div style="font-size:15px;font-weight:700;color:${cur.profit>=0?'var(--accent3)':'var(--accent2)'};">${fmt(cur.profit)}</div>
+            <div>${diff(cur.profit,prev.profit)||'—'}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}`:''}
+    `:''}
+
+    ${reportState.tab==='report'?`
     <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;">
       <div class="form-group" style="margin:0;"><label>Период</label>
         <select class="form-control" id="report-days" style="width:130px;">
@@ -1232,7 +1328,7 @@ function renderReport(accessPoints){
     <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:15%"><col style="width:20%"><col style="width:15%"><col style="width:50%"></colgroup><thead><tr><th>Дата/Период</th><th>Тип</th><th class="num">Сумма</th><th>Описание</th></tr></thead>
       <tbody>${expRows||'<tr><td colspan="4"><div class="empty">Нет расходов</div></td></tr>'}</tbody>
     </table></div></div></div></div>
-
+    `:''}  
   `;
 }
 
