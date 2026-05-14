@@ -1007,6 +1007,24 @@ function renderBank(){
     <td class="txt-cut" title="${t.counterpart||''}">${t.counterpart||'—'}</td>
     <td class="txt-cut" style="color:var(--text2);" title="${t.purpose||''}">${t.purpose||'—'}</td>
     <td class="txt-cut" style="color:var(--accent);font-size:11px;">${t.category||'—'}</td>
+    <td style="padding:4px 6px;">
+      ${Number(t.debit)>0?`<select style="width:100%;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:3px 4px;"
+        onchange="updateBankTx('${t.id}','point_id',this.value)">
+        <option value="">—</option>
+        ${POINTS.map(p=>`<option value="${p.id}" ${t.point_id===p.id?'selected':''}>${p.short}</option>`).join('')}
+      </select>`:'—'}
+    </td>
+    <td style="padding:4px 6px;">
+      ${Number(t.debit)>0?`<select style="width:100%;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:3px 4px;"
+        onchange="updateBankTx('${t.id}','expense_type',this.value)">
+        <option value="">—</option>
+        ${getExpTypes().map(et=>`<option value="${et}" ${t.expense_type===et?'selected':''}>${et}</option>`).join('')}
+      </select>`:'—'}
+    </td>
+    <td style="text-align:center;padding:4px;">
+      ${Number(t.debit)>0?`<input type="checkbox" ${t.is_expense?'checked':''} style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent3);"
+        onchange="updateBankTx('${t.id}','is_expense',this.checked)">`:'—'}
+    </td>
     <td>${t.approved?'<span class="badge badge-g">✓ Принято</span>':'<span class="badge badge-y">Ожидает</span>'}</td>
     <td style="display:flex;gap:4px;">
       ${!t.approved&&STATE.user.role==='admin'?`<button class="btn btn-success" style="padding:2px 7px;font-size:10px;" data-approve-tx="${t.id}">✓</button>`:''}
@@ -1065,8 +1083,13 @@ function renderBank(){
 
     <div class="stats-grid" style="margin-bottom:18px;">
       <div class="stat-card"><div class="stat-label">Всего приходов</div><div class="stat-value g">${fmt(totC)}</div></div>
-      <div class="stat-card"><div class="stat-label">Всего расходов</div><div class="stat-value r">${fmt(totD)}</div></div>
+      <div class="stat-card"><div class="stat-label">Всего дебетов</div><div class="stat-value r">${fmt(totD)}</div></div>
       <div class="stat-card"><div class="stat-label">Транзакций</div><div class="stat-value b">${bk.length}</div></div>
+      <div class="stat-card" style="border-color:rgba(16,185,129,.3);cursor:pointer;" onclick="transferExpensesFromBank();">
+        <div class="stat-label">К переносу в расходы</div>
+        <div class="stat-value g">${bk.filter(t=>t.is_expense&&t.point_id&&t.expense_type&&!t.approved).length}</div>
+        <div class="stat-sub">нажмите для переноса</div>
+      </div>
     </div>
     <div class="section-title">Загрузить выписку</div>
     <div style="background:var(--card);border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;margin-bottom:18px;">
@@ -1075,10 +1098,21 @@ function renderBank(){
       <p style="color:var(--text3);font-size:11px;margin-bottom:14px;">Формат: Дата | Описание | Приход | Расход</p>
       <label class="btn btn-primary" style="cursor:pointer;">📤 Выбрать файл Excel<input type="file" id="bank-file-input" accept=".xlsx,.xls" style="display:none;"/></label>
     </div>
-    <div class="table-card"><div class="table-head"><h3>Банковские операции</h3></div>
+    <div class="table-card">
+    <div class="table-head">
+      <h3>Банковские операции</h3>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:11px;color:var(--text3);">
+          Отмечено к переносу: <b style="color:var(--accent3);">${bk.filter(t=>t.is_expense&&t.point_id&&t.expense_type).length}</b>
+        </span>
+        ${STATE.user.role==='admin'?`<button class="btn btn-success" style="font-size:12px;" onclick="transferExpensesFromBank();">
+          💸 Перенести в расходы
+        </button>`:''}
+      </div>
+    </div>
     <div class="table-scroll" style="overflow-x:auto;"><table style="table-layout:fixed;min-width:800px;width:100%;">
-<colgroup><col style="width:11%"><col style="width:10%"><col style="width:12%"><col style="width:12%"><col style="width:17%"><col style="width:24%"><col style="width:9%"><col style="width:5%"></colgroup>
-<thead><tr><th>Фирма</th><th>Дата</th><th class="num">Дебет</th><th class="num">Кредит</th><th>Контрагент</th><th>Назначение платежа</th><th>Категория</th><th>Статус</th><th></th></tr></thead>
+<colgroup><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:12%"><col style="width:14%"><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:7%"><col style="width:7%"><col style="width:5%"></colgroup>
+<thead><tr><th>Фирма</th><th>Дата</th><th class="num">Дебет</th><th class="num">Кредит</th><th>Контрагент</th><th>Назначение</th><th>Категория</th><th>Точка</th><th>Тип расхода</th><th>Расход?</th><th>Статус</th><th></th></tr></thead>
     <tbody>${rows||'<tr><td colspan="9"><div class="empty">Нет операций</div></td></tr>'}</tbody></table></div></div>
   `;
 }
@@ -2663,6 +2697,52 @@ async function restoreBackup(file){
 }
 
 
+
+
+// ─── BANK TX HELPERS ─────────────────────────────────────────────────────────
+async function updateBankTx(id, field, value){
+  const update = {};
+  update[field] = value;
+  await sb.from('bank_transactions').update(update).eq('id', id);
+  // Update local state without full reload for speed
+  STATE.bankTx = STATE.bankTx.map(t=>t.id===id?{...t,...update}:t);
+  render();
+}
+
+async function transferExpensesFromBank(){
+  const toTransfer = STATE.bankTx.filter(t=>
+    t.is_expense && t.point_id && t.expense_type && Number(t.debit)>0 && !t.approved
+  );
+  
+  if(toTransfer.length===0){
+    showAlert('error','Нет записей для переноса. Отметьте галочку "Расход?" и выберите Точку и Тип расхода.');
+    return;
+  }
+  
+  if(!confirm(`Перенести ${toTransfer.length} записей в Расходы?`)) return;
+  
+  let saved=0, errors=0;
+  for(const t of toTransfer){
+    // Add to expenses
+    const {error} = await sb.from('expenses').insert({
+      date: t.date?.slice(0,10)||today(),
+      point_id: t.point_id,
+      type: t.expense_type,
+      amount: Number(t.debit),
+      description: t.purpose||t.counterpart||'Из банка',
+      user_id: STATE.user.id,
+    });
+    if(error){ errors++; continue; }
+    
+    // Mark as approved in bank
+    await sb.from('bank_transactions').update({approved:true}).eq('id',t.id);
+    saved++;
+  }
+  
+  await loadAll();
+  showAlert(errors>0?'error':'success',
+    `✓ Перенесено ${saved} расходов${errors>0?', ошибок: '+errors:''}`);
+}
 
 // ─── TEMPLATE DOWNLOAD ───────────────────────────────────────────────────────
 function downloadEntryTemplate(pointId){
