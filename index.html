@@ -125,6 +125,18 @@ select.form-control option{background:var(--bg2);}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .top-alert{position:fixed;top:16px;right:16px;z-index:999;min-width:260px;box-shadow:0 4px 20px rgba(0,0,0,.3);}
 
+/* ── EXCEL GRID ── */
+.grid-cell{
+  width:100%;background:transparent;border:1px solid transparent;
+  border-radius:4px;padding:4px 6px;font-size:12px;color:var(--text);
+  font-family:'Inter',sans-serif;outline:none;transition:all .15s;
+}
+.grid-cell:hover{border-color:var(--border);background:var(--bg3);}
+.grid-cell:focus{border-color:var(--accent);background:var(--bg2);box-shadow:0 0 0 2px rgba(245,158,11,.15);}
+select.grid-cell{cursor:pointer;appearance:auto;}
+tr:hover .grid-cell{border-color:var(--border);}
+.exp-row-selected{background:rgba(245,158,11,.06)!important;}
+
 /* ── MOBILE ── */
 .hamburger{display:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:18px;align-items:center;justify-content:center;}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;backdrop-filter:blur(2px);}
@@ -753,6 +765,80 @@ function renderEntryModal(){
 // expState.pointId — выбранная точка; expState.tab — expenses|salaries
 let expState = {tab:'expenses', pointId:'', modal:null, salModal:null, manageCats:false, editModal:null, editSalModal:null, filterDate:'', filterType:''};
 
+// ─── EXPENSE GRID OBJECT ──────────────────────────────────────────────────────
+const expGrid = {
+  sortCol:'date', sortAsc:false,
+  selected: new Set(),
+  activeFilter:'', filterVal:'',
+
+  getRows(rows){
+    let f=[...rows];
+    if(this.filterVal){
+      if(this.activeFilter==='date') f=f.filter(e=>e.date?.startsWith(this.filterVal));
+      else if(this.activeFilter==='type') f=f.filter(e=>e.type===this.filterVal);
+    }
+    const col=this.sortCol, asc=this.sortAsc;
+    f.sort((a,b)=>{
+      let va=a[col]||'', vb=b[col]||'';
+      if(col==='amount'){va=Number(va);vb=Number(vb);}
+      return va<vb?(asc?-1:1):va>vb?(asc?1:-1):0;
+    });
+    return f;
+  },
+
+  sortBy(col){
+    if(this.sortCol===col) this.sortAsc=!this.sortAsc;
+    else{this.sortCol=col;this.sortAsc=true;}
+    render();
+  },
+
+  toggleFilter(col){
+    if(this.activeFilter===col){this.activeFilter='';this.filterVal='';}
+    else{this.activeFilter=col;this.filterVal='';}
+    render();
+  },
+
+  toggleSelect(id,checked){
+    if(checked) this.selected.add(id);
+    else this.selected.delete(id);
+  },
+
+  selectAll(checked){
+    const visible = this.getRows(STATE.expenses.filter(e=>e.point_id===expState.pointId));
+    if(checked) visible.forEach(e=>this.selected.add(e.id));
+    else this.selected.clear();
+    render();
+  },
+
+  async updateCell(id,field,value){
+    const update={};
+    update[field]=field==='amount'?parseFloat(value)||0:value;
+    STATE.expenses=STATE.expenses.map(e=>e.id===id?{...e,...update}:e);
+    render();
+    const {error}=await sb.from('expenses').update(update).eq('id',id);
+    if(error) showAlert('error','Ошибка: '+error.message);
+  },
+
+  async deleteRow(id){
+    if(!confirm('Удалить строку?')) return;
+    STATE.expenses=STATE.expenses.filter(e=>e.id!==id);
+    this.selected.delete(id);
+    render();
+    await sb.from('expenses').delete().eq('id',id);
+  },
+
+  async deleteSelected(){
+    const ids=[...this.selected];
+    if(!ids.length) return;
+    if(!confirm(`Удалить ${ids.length} строк?`)) return;
+    STATE.expenses=STATE.expenses.filter(e=>!ids.includes(e.id));
+    this.selected.clear();
+    render();
+    for(const id of ids) await sb.from('expenses').delete().eq('id',id);
+    showAlert('success',`Удалено ${ids.length} строк`);
+  },
+};
+
 function renderExpenses(accessPoints){
   // Init selected point — operator auto-gets their own point
   if(!expState.pointId){
@@ -903,16 +989,12 @@ function renderExpenses(accessPoints){
     </div>` : ''}
 
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;">
-      <button class="btn btn-ghost" style="font-size:12px;"
-        onclick="downloadExpenseTemplate()">
-        📋 Шаблон
-      </button>
+      <button class="btn btn-ghost" style="font-size:12px;" onclick="downloadExpenseTemplate()">📋 Шаблон</button>
       <label class="btn btn-ghost" style="cursor:pointer;font-size:12px;">
         📥 Импорт Excel
-        <input type="file" accept=".xlsx,.xls" style="display:none;"
-          onchange="handleExpenseImport(this);this.value='';" />
+        <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleExpenseImport(this);this.value='';" />
       </label>
-      <button class="btn btn-primary" id="add-exp-btn">+ Добавить расход</button>
+      <button class="btn btn-primary" id="add-exp-btn">+ Новая строка</button>
     </div>
     ${expImportMode?`
     <div class="table-card" style="margin-bottom:16px;border-color:var(--accent3);">
@@ -951,9 +1033,72 @@ function renderExpenses(accessPoints){
         <button class="btn btn-primary" onclick="saveExpenseImport();">💾 Сохранить все ${expImportData.length} расходов</button>
       </div>
     </div>`:''}
-    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup><col style="width:15%"><col style="width:20%"><col style="width:15%"><col style="width:32%"><col style="width:18%"></colgroup><thead><tr><th>Дата</th><th>Тип</th><th class="num">Сумма</th><th>Описание</th><th></th></tr></thead>
-      <tbody>${expRows||'<tr><td colspan="5"><div class="empty">Нет расходов для этой точки</div></td></tr>'}</tbody>
-    </table></div>
+    <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup>
+            <col style="width:4%"><col style="width:11%"><col style="width:17%"><col style="width:12%"><col style="width:36%"><col style="width:12%"><col style="width:4%">
+          </colgroup>
+          <thead><tr>
+            <th style="padding:8px;text-align:center;"><input type="checkbox" id="exp-select-all" onchange="expGrid.selectAll(this.checked)" style="cursor:pointer;"/></th>
+            <th style="padding:8px;cursor:pointer;user-select:none;" onclick="expGrid.sortBy('date')">Дата ${expGrid.sortCol==='date'?(expGrid.sortAsc?'▲':'▼'):''} <span style="color:var(--text3);font-size:9px;" onclick="event.stopPropagation();expGrid.toggleFilter('date')">▼</span></th>
+            <th style="padding:8px;cursor:pointer;user-select:none;" onclick="expGrid.sortBy('type')">Тип ${expGrid.sortCol==='type'?(expGrid.sortAsc?'▲':'▼'):''} <span style="color:var(--text3);font-size:9px;" onclick="event.stopPropagation();expGrid.toggleFilter('type')">▼</span></th>
+            <th style="padding:8px;cursor:pointer;user-select:none;text-align:right;" onclick="expGrid.sortBy('amount')">Сумма ${expGrid.sortCol==='amount'?(expGrid.sortAsc?'▲':'▼'):''}</th>
+            <th style="padding:8px;cursor:pointer;user-select:none;" onclick="expGrid.sortBy('description')">Описание</th>
+            <th style="padding:8px;text-align:right;color:var(--accent2);font-size:11px;">Итого: ${fmt(visExp.reduce((s,e)=>s+Number(e.amount||0),0))}</th>
+            <th></th>
+          </tr>
+          ${expGrid.activeFilter?`<tr style="background:var(--bg3);">
+            <td></td>
+            <td colspan="5" style="padding:6px 8px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:11px;color:var(--text2);">Фильтр по ${expGrid.activeFilter==='date'?'дате':'типу'}:</span>
+                ${expGrid.activeFilter==='date'?
+                  `<input type="month" class="form-control" value="${expGrid.filterVal}" style="width:150px;font-size:12px;" oninput="expGrid.filterVal=this.value;render();"/>`
+                  :`<select class="form-control" style="width:200px;font-size:12px;" onchange="expGrid.filterVal=this.value;render();">
+                    <option value="">Все типы</option>
+                    ${getExpTypes().map(t=>`<option value="${t}" ${t===expGrid.filterVal?'selected':''}>${t}</option>`).join('')}
+                  </select>`}
+                ${expGrid.filterVal?`<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="expGrid.filterVal='';render();">✕</button>`:''}
+                <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="expGrid.activeFilter='';render();">Закрыть</button>
+              </div>
+            </td>
+            <td></td>
+          </tr>`:''}
+          </thead>
+          <tbody>
+            ${expGrid.getRows(visExp).map(e=>`
+            <tr style="border-top:1px solid var(--border);background:${expGrid.selected.has(e.id)?'rgba(245,158,11,.08)':''};">
+              <td style="padding:4px 8px;text-align:center;">
+                <input type="checkbox" ${expGrid.selected.has(e.id)?'checked':''} onchange="expGrid.toggleSelect('${e.id}',this.checked);render();" style="cursor:pointer;accent-color:var(--accent);"/>
+              </td>
+              <td style="padding:2px 4px;">
+                <input type="date" value="${e.date}" class="grid-cell" title="${fmtDate(e.date)}"
+                  onchange="expGrid.updateCell('${e.id}','date',this.value)"/>
+              </td>
+              <td style="padding:2px 4px;">
+                <select class="grid-cell" onchange="expGrid.updateCell('${e.id}','type',this.value)">
+                  ${getExpTypes().map(t=>`<option value="${t}" ${t===e.type?'selected':''}>${t}</option>`).join('')}
+                </select>
+              </td>
+              <td style="padding:2px 4px;">
+                <input type="number" value="${e.amount}" class="grid-cell" style="text-align:right;"
+                  onblur="expGrid.updateCell('${e.id}','amount',this.value)"/>
+              </td>
+              <td style="padding:2px 4px;">
+                <input type="text" value="${e.description||''}" class="grid-cell" placeholder="—"
+                  onblur="expGrid.updateCell('${e.id}','description',this.value)"/>
+              </td>
+              <td style="padding:6px 8px;text-align:right;font-size:11px;font-weight:600;color:var(--accent2);">${fmt(e.amount)}</td>
+              <td style="padding:2px 4px;text-align:center;">
+                <button onclick="expGrid.deleteRow('${e.id}')" style="background:none;border:none;cursor:pointer;color:var(--accent2);font-size:18px;line-height:1;" title="Удалить">×</button>
+              </td>
+            </tr>`).join('')}
+            ${expGrid.getRows(visExp).length===0?`<tr><td colspan="7"><div class="empty">Нет расходов</div></td></tr>`:''}
+            ${expGrid.selected.size>0?`<tr style="background:var(--bg3);"><td colspan="7" style="padding:8px 12px;">
+              <span style="font-size:12px;color:var(--text2);margin-right:10px;">Выбрано: <b>${expGrid.selected.size}</b></span>
+              <button class="btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="expGrid.deleteSelected();">🗑 Удалить</button>
+              <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;margin-left:6px;" onclick="expGrid.selected.clear();render();">Снять</button>
+            </td></tr>`:''}
+          </tbody>
+        </table></div>
     ${expModal}${salModal}
 
     ${expState.editModal ? `
@@ -980,6 +1125,71 @@ function renderExpenses(accessPoints){
 }
 
 // ─── BANK ────────────────────────────────────────────────────────────────────
+// ─── BANK GRID ───────────────────────────────────────────────────────────────
+const bankGrid = {
+  sortCol:'date', sortAsc:false,
+  selected: new Set(),
+  activeFilter:'', filterVal:'',
+
+  getRows(rows){
+    let f=[...rows];
+    if(this.filterVal){
+      if(this.activeFilter==='category') f=f.filter(t=>t.category===this.filterVal);
+      else if(this.activeFilter==='firm') f=f.filter(t=>t.doc_no===this.filterVal);
+      else if(this.activeFilter==='type') f=f.filter(t=>t.txType===this.filterVal);
+    }
+    const col=this.sortCol, asc=this.sortAsc;
+    f.sort((a,b)=>{
+      let va=a[col]||'', vb=b[col]||'';
+      if(col==='debit'||col==='credit'){va=Number(va);vb=Number(vb);}
+      return va<vb?(asc?-1:1):va>vb?(asc?1:-1):0;
+    });
+    return f;
+  },
+
+  sortBy(col){
+    if(this.sortCol===col) this.sortAsc=!this.sortAsc;
+    else{this.sortCol=col;this.sortAsc=true;}
+    render();
+  },
+
+  toggleFilter(col){
+    if(this.activeFilter===col){this.activeFilter='';this.filterVal='';}
+    else{this.activeFilter=col;this.filterVal='';}
+    render();
+  },
+
+  toggleSelect(id,checked){
+    if(checked) this.selected.add(id);
+    else this.selected.delete(id);
+  },
+
+  selectAll(checked,rows){
+    if(checked) rows.forEach(t=>this.selected.add(t.id));
+    else this.selected.clear();
+    render();
+  },
+
+  async updateCell(id,field,value){
+    const update={};
+    update[field]=value===true||value===false?value:value;
+    STATE.bankTx=STATE.bankTx.map(t=>t.id===id?{...t,...update}:t);
+    render();
+    await sb.from('bank_transactions').update(update).eq('id',id);
+  },
+
+  async deleteSelected(){
+    const ids=[...this.selected];
+    if(!ids.length) return;
+    if(!confirm(`Удалить ${ids.length} записей?`)) return;
+    STATE.bankTx=STATE.bankTx.filter(t=>!ids.includes(t.id));
+    this.selected.clear();
+    render();
+    for(const id of ids) await sb.from('bank_transactions').delete().eq('id',id);
+    showAlert('success',`Удалено ${ids.length}`);
+  },
+};
+
 function renderBank(){
   // Get unique categories and firms for filter dropdowns
   const allCats = [...new Set(STATE.bankTx.map(t=>t.category).filter(Boolean))].sort();
@@ -999,14 +1209,35 @@ function renderBank(){
   const allBk = STATE.bankTx;
   const totC = bk.reduce((s,t)=>s+Number(t.credit||0),0);
   const totD = bk.reduce((s,t)=>s+Number(t.debit||0),0);
-  const rows = bk.map(t=>`<tr>
-    <td class="txt-cut" style="font-size:11px;color:var(--text3);">${t.doc_no||'—'}</td>
-    <td style="font-size:12px;white-space:nowrap;">${fmtDate(t.date)}</td>
-    <td class="num" style="color:var(--accent2);font-weight:500;">${Number(t.debit)>0?fmt(t.debit):'—'}</td>
-    <td class="num" style="color:var(--accent3);font-weight:500;">${Number(t.credit)>0?fmt(t.credit):'—'}</td>
-    <td class="txt-cut" title="${t.counterpart||''}">${t.counterpart||'—'}</td>
-    <td class="txt-cut" style="color:var(--text2);" title="${t.purpose||''}">${t.purpose||'—'}</td>
-    <td class="txt-cut" style="color:var(--accent);font-size:11px;">${t.category||'—'}</td>
+  const sortedBk = bankGrid.getRows(bk);
+  const rows = sortedBk.map(t=>`<tr style="border-top:1px solid var(--border);background:${bankGrid.selected.has(t.id)?'rgba(245,158,11,.06)':''};">
+    <td style="padding:4px 8px;text-align:center;">
+      <input type="checkbox" ${bankGrid.selected.has(t.id)?'checked':''} 
+        onchange="bankGrid.toggleSelect('${t.id}',this.checked);render();" 
+        style="cursor:pointer;accent-color:var(--accent);"/>
+    </td>
+    <td style="padding:2px 4px;">
+      <input type="text" value="${t.doc_no||''}" class="grid-cell" placeholder="—"
+        onblur="bankGrid.updateCell('${t.id}','doc_no',this.value)"/>
+    </td>
+    <td style="padding:2px 4px;">
+      <input type="date" value="${t.date||''}" class="grid-cell"
+        onchange="bankGrid.updateCell('${t.id}','date',this.value)"/>
+    </td>
+    <td class="num" style="color:var(--accent2);font-weight:500;padding:6px 8px;">${Number(t.debit)>0?fmt(t.debit):'—'}</td>
+    <td class="num" style="color:var(--accent3);font-weight:500;padding:6px 8px;">${Number(t.credit)>0?fmt(t.credit):'—'}</td>
+    <td style="padding:2px 4px;">
+      <input type="text" value="${t.counterpart||''}" class="grid-cell" placeholder="—"
+        onblur="bankGrid.updateCell('${t.id}','counterpart',this.value)"/>
+    </td>
+    <td style="padding:2px 4px;">
+      <input type="text" value="${t.purpose||''}" class="grid-cell" placeholder="—"
+        onblur="bankGrid.updateCell('${t.id}','purpose',this.value)"/>
+    </td>
+    <td style="padding:2px 4px;">
+      <input type="text" value="${t.category||''}" class="grid-cell" placeholder="—"
+        onblur="bankGrid.updateCell('${t.id}','category',this.value)"/>
+    </td>
     <td style="padding:4px 6px;">
       ${Number(t.debit)>0?`<select style="width:100%;font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:3px 4px;"
         onchange="updateBankTx('${t.id}','point_id',this.value)">
@@ -1026,11 +1257,22 @@ function renderBank(){
         onchange="updateBankTx('${t.id}','is_expense',this.checked)">`:'—'}
     </td>
     <td>${t.approved?'<span class="badge badge-g">✓ Принято</span>':'<span class="badge badge-y">Ожидает</span>'}</td>
-    <td style="display:flex;gap:4px;">
-      ${!t.approved&&STATE.user.role==='admin'?`<button class="btn btn-success" style="padding:2px 7px;font-size:10px;" data-approve-tx="${t.id}">✓</button>`:''}
-      ${STATE.user.role==='admin'?`<button class="btn btn-danger" style="padding:2px 7px;font-size:10px;" data-del-tx="${t.id}">✕</button>`:''}
+    <td style="padding:4px;text-align:center;">
+      ${!t.approved&&STATE.user.role==='admin'?`<button class="btn btn-success" style="padding:2px 6px;font-size:10px;" data-approve-tx="${t.id}">✓</button>`:''}
+      ${t.approved?'<span class="badge badge-g" style="font-size:9px;">✓</span>':''}
+    </td>
+    <td style="padding:2px 4px;text-align:center;">
+      <button onclick="bankGrid.updateCell('${t.id}','approved',false);STATE.bankTx=STATE.bankTx.filter(x=>x.id!=='${t.id}');render();sb.from('bank_transactions').delete().eq('id','${t.id}');" 
+        style="background:none;border:none;cursor:pointer;color:var(--accent2);font-size:18px;line-height:1;" title="Удалить">×</button>
     </td>
   </tr>`).join('');
+  
+  const bankSelectedBar = bankGrid.selected.size>0?`
+    <div style="padding:8px 12px;background:var(--bg3);border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+      <span style="font-size:12px;color:var(--text2);">Выбрано: <b>${bankGrid.selected.size}</b></span>
+      <button class="btn btn-danger" style="padding:4px 10px;font-size:11px;" onclick="bankGrid.deleteSelected();">🗑 Удалить</button>
+      <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px;" onclick="bankGrid.selected.clear();render();">Снять</button>
+    </div>`:''
   return `
     <div class="table-card" style="padding:14px;margin-bottom:14px;">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;">
@@ -1111,9 +1353,50 @@ function renderBank(){
       </div>
     </div>
     <div class="table-scroll" style="overflow-x:auto;"><table style="table-layout:fixed;min-width:800px;width:100%;">
-<colgroup><col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:12%"><col style="width:14%"><col style="width:8%"><col style="width:8%"><col style="width:10%"><col style="width:7%"><col style="width:7%"><col style="width:5%"></colgroup>
-<thead><tr><th>Фирма</th><th>Дата</th><th class="num">Дебет</th><th class="num">Кредит</th><th>Контрагент</th><th>Назначение</th><th>Категория</th><th>Точка</th><th>Тип расхода</th><th>Расход?</th><th>Статус</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="9"><div class="empty">Нет операций</div></td></tr>'}</tbody></table></div></div>
+
+<thead>
+          <tr>
+            <th style="padding:8px;text-align:center;width:4%;">
+              <input type="checkbox" onchange="bankGrid.selectAll(this.checked,sortedBk||[])" style="cursor:pointer;"/>
+            </th>
+            <th style="padding:8px;cursor:pointer;width:8%;" onclick="bankGrid.sortBy('doc_no')">Фирма ${bankGrid.sortCol==='doc_no'?(bankGrid.sortAsc?'▲':'▼'):''} <span style="font-size:9px;color:var(--text3);" onclick="event.stopPropagation();bankGrid.toggleFilter('firm')">▼</span></th>
+            <th style="padding:8px;cursor:pointer;width:9%;" onclick="bankGrid.sortBy('date')">Дата ${bankGrid.sortCol==='date'?(bankGrid.sortAsc?'▲':'▼'):''}</th>
+            <th style="padding:8px;cursor:pointer;text-align:right;width:10%;" onclick="bankGrid.sortBy('debit')">Дебет ${bankGrid.sortCol==='debit'?(bankGrid.sortAsc?'▲':'▼'):''}</th>
+            <th style="padding:8px;cursor:pointer;text-align:right;width:10%;" onclick="bankGrid.sortBy('credit')">Кредит ${bankGrid.sortCol==='credit'?(bankGrid.sortAsc?'▲':'▼'):''}</th>
+            <th style="padding:8px;width:13%;">Контрагент</th>
+            <th style="padding:8px;width:16%;">Назначение</th>
+            <th style="padding:8px;cursor:pointer;width:9%;" onclick="bankGrid.sortBy('category')">Категория <span style="font-size:9px;color:var(--text3);" onclick="event.stopPropagation();bankGrid.toggleFilter('category')">▼</span></th>
+            <th style="padding:8px;width:8%;">Точка</th>
+            <th style="padding:8px;width:10%;">Тип расхода</th>
+            <th style="padding:8px;width:6%;">Расход?</th>
+            <th style="padding:8px;width:7%;">Статус</th>
+            <th style="width:5%;"></th>
+          </tr>
+          ${bankGrid.activeFilter?`<tr style="background:var(--bg3);">
+            <td></td>
+            <td colspan="11" style="padding:6px 8px;">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:11px;color:var(--text2);">Фильтр:</span>
+                ${bankGrid.activeFilter==='firm'?
+                  `<select class="form-control" style="width:200px;font-size:12px;" onchange="bankGrid.filterVal=this.value;render();">
+                    <option value="">Все фирмы</option>
+                    ${allFirms.map(f=>`<option value="${f}" ${f===bankGrid.filterVal?'selected':''}>${f}</option>`).join('')}
+                  </select>`
+                  :`<select class="form-control" style="width:200px;font-size:12px;" onchange="bankGrid.filterVal=this.value;render();">
+                    <option value="">Все категории</option>
+                    ${allCats.map(cat=>`<option value="${cat}" ${cat===bankGrid.filterVal?'selected':''}>${cat}</option>`).join('')}
+                  </select>`}
+                ${bankGrid.filterVal?`<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="bankGrid.filterVal='';render();">✕</button>`:''}
+                <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="bankGrid.activeFilter='';render();">Закрыть</button>
+              </div>
+            </td>
+            <td></td>
+          </tr>`:''}
+        </thead>
+    <tbody>${rows||'<tr><td colspan="13"><div class="empty">Нет операций. Загрузите выписку.</div></td></tr>'}</tbody>
+    </table></div>
+    ${bankSelectedBar||''}
+  </div>
   `;
 }
 
@@ -1775,25 +2058,26 @@ function bindEvents(accessPoints){
   document.querySelectorAll('[data-exp-point]').forEach(el=>{
     el.addEventListener('click',()=>{expState.pointId=el.dataset.expPoint;expState.modal=null;expState.salModal=null;render();});
   });
-  document.getElementById('add-exp-btn')?.addEventListener('click',()=>{expState.modal={};render();});
-  document.getElementById('exp-modal-close')?.addEventListener('click',()=>{expState.modal=null;render();});
-  document.getElementById('exp-modal-close2')?.addEventListener('click',()=>{expState.modal=null;render();});
-  document.getElementById('exp-modal-overlay')?.addEventListener('click',e=>{if(e.target.id==='exp-modal-overlay'){expState.modal=null;render();}});
-  document.getElementById('exp-save-btn')?.addEventListener('click',async()=>{
-    const d={
-      date:document.getElementById('exp-date').value,
-      point_id:expState.pointId,
-      type:document.getElementById('exp-type').value,
-      amount:Number(document.getElementById('exp-amount').value)||0,
-      description:document.getElementById('exp-desc').value,
-      user_id:STATE.user.id
+  // Add new row inline
+  document.getElementById('add-exp-btn')?.addEventListener('click',async()=>{
+    const newRow = {
+      date: today(),
+      point_id: expState.pointId,
+      type: getExpTypes()[0]||'Прочее',
+      amount: 0,
+      description: '',
+      user_id: STATE.user.id,
     };
-    if(!d.amount){showAlert('error','Укажите сумму');return;}
-    const btn=document.getElementById('exp-save-btn');
-    btn.disabled=true;btn.textContent='Сохранение...';
-    const {error}=await sb.from('expenses').insert(d);
-    if(error){showAlert('error',error.message);btn.disabled=false;btn.textContent='Сохранить';}
-    else{showAlert('success','Расход добавлен');expState.modal=null;await loadAll();}
+    const {data,error} = await sb.from('expenses').insert(newRow).select().single();
+    if(error){showAlert('error',error.message);return;}
+    STATE.expenses = [data, ...STATE.expenses];
+    expGrid.sortCol='date'; expGrid.sortAsc=false;
+    render();
+    // Focus first input of new row
+    setTimeout(()=>{
+      const inputs = document.querySelectorAll('#exp-grid tbody tr:first-child .grid-cell');
+      if(inputs[0]) inputs[0].focus();
+    },50);
   });
   // Edit expense
   document.querySelectorAll('[data-edit-exp]').forEach(el=>{
