@@ -232,7 +232,9 @@ let STATE = {
   alert: null,
   alertTimer: null,
 };
-
+let bankFilter = { type: 'ALL', search: '' };
+let empMap = {};
+let reportState = { tab: 'report', pointId: 'ALL', days: '7' };
 function setState(patch){
   Object.assign(STATE, patch);
   render();
@@ -1237,7 +1239,10 @@ function renderBank(){
       <input type="text" value="${t.doc_no||''}" class="grid-cell" placeholder="—"
         onblur="bankGrid.updateCell('${t.id}','doc_no',this.value)"/>
     </td>
-    <td style="padding:2px 4px;">
+    let bankFilter = { type: 'ALL', search: '' 
+	let empMap = {};
+	let reportState = { tab: 'report', pointId: 'ALL', days: '7' 
+	<td style="padding:2px 4px;">
       <input type="date" value="${t.date||''}" class="grid-cell"
         onchange="bankGrid.updateCell('${t.id}','date',this.value)"/>
     </td>
