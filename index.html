@@ -770,13 +770,18 @@ const expGrid = {
   sortCol:'date', sortAsc:false,
   selected: new Set(),
   activeFilter:'', filterVal:'',
+  filters: {}, // {col: value} - multiple column filters
 
   getRows(rows){
     let f=[...rows];
-    if(this.filterVal){
-      if(this.activeFilter==='date') f=f.filter(e=>e.date?.startsWith(this.filterVal));
-      else if(this.activeFilter==='type') f=f.filter(e=>e.type===this.filterVal);
-    }
+    // Apply all active filters
+    Object.entries(this.filters).forEach(([col,val])=>{
+      if(!val) return;
+      if(col==='date') f=f.filter(e=>e.date?.startsWith(val));
+      else if(col==='amount_min') f=f.filter(e=>Number(e.amount||0)>=Number(val));
+      else if(col==='amount_max') f=f.filter(e=>Number(e.amount||0)<=Number(val));
+      else f=f.filter(e=>String(e[col]||'').toLowerCase().includes(val.toLowerCase()));
+    });
     const col=this.sortCol, asc=this.sortAsc;
     f.sort((a,b)=>{
       let va=a[col]||'', vb=b[col]||'';
@@ -1036,32 +1041,40 @@ function renderExpenses(accessPoints){
     <div class="table-card"><div class="table-scroll"><table style="table-layout:fixed;width:100%;"><colgroup>
             <col style="width:4%"><col style="width:11%"><col style="width:17%"><col style="width:12%"><col style="width:36%"><col style="width:12%"><col style="width:4%">
           </colgroup>
-          <thead><tr>
-            <th style="padding:8px;text-align:center;"><input type="checkbox" id="exp-select-all" onchange="expGrid.selectAll(this.checked)" style="cursor:pointer;"/></th>
-            <th style="padding:8px;cursor:pointer;user-select:none;" onclick="expGrid.sortBy('date')">Дата ${expGrid.sortCol==='date'?(expGrid.sortAsc?'▲':'▼'):''} <span style="color:var(--text3);font-size:9px;" onclick="event.stopPropagation();expGrid.toggleFilter('date')">▼</span></th>
-            <th style="padding:8px;cursor:pointer;user-select:none;" onclick="expGrid.sortBy('type')">Тип ${expGrid.sortCol==='type'?(expGrid.sortAsc?'▲':'▼'):''} <span style="color:var(--text3);font-size:9px;" onclick="event.stopPropagation();expGrid.toggleFilter('type')">▼</span></th>
-            <th style="padding:8px;cursor:pointer;user-select:none;text-align:right;" onclick="expGrid.sortBy('amount')">Сумма ${expGrid.sortCol==='amount'?(expGrid.sortAsc?'▲':'▼'):''}</th>
-            <th style="padding:8px;cursor:pointer;user-select:none;" onclick="expGrid.sortBy('description')">Описание</th>
-            <th style="padding:8px;text-align:right;color:var(--accent2);font-size:11px;">Итого: ${fmt(visExp.reduce((s,e)=>s+Number(e.amount||0),0))}</th>
-            <th></th>
-          </tr>
-          ${expGrid.activeFilter?`<tr style="background:var(--bg3);">
-            <td></td>
-            <td colspan="5" style="padding:6px 8px;">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:11px;color:var(--text2);">Фильтр по ${expGrid.activeFilter==='date'?'дате':'типу'}:</span>
-                ${expGrid.activeFilter==='date'?
-                  `<input type="month" class="form-control" value="${expGrid.filterVal}" style="width:150px;font-size:12px;" oninput="expGrid.filterVal=this.value;render();"/>`
-                  :`<select class="form-control" style="width:200px;font-size:12px;" onchange="expGrid.filterVal=this.value;render();">
-                    <option value="">Все типы</option>
-                    ${getExpTypes().map(t=>`<option value="${t}" ${t===expGrid.filterVal?'selected':''}>${t}</option>`).join('')}
-                  </select>`}
-                ${expGrid.filterVal?`<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="expGrid.filterVal='';render();">✕</button>`:''}
-                <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="expGrid.activeFilter='';render();">Закрыть</button>
-              </div>
-            </td>
-            <td></td>
-          </tr>`:''}
+          <thead>
+            <tr>
+              <th style="padding:8px;text-align:center;"><input type="checkbox" id="exp-select-all" onchange="expGrid.selectAll(this.checked)" style="cursor:pointer;"/></th>
+              <th style="padding:8px;cursor:pointer;user-select:none;" onclick="expGrid.sortBy('date')">Дата ${expGrid.sortCol==='date'?(expGrid.sortAsc?'▲':'▼'):''}</th>
+              <th style="padding:8px;cursor:pointer;user-select:none;" onclick="expGrid.sortBy('type')">Тип ${expGrid.sortCol==='type'?(expGrid.sortAsc?'▲':'▼'):''}</th>
+              <th style="padding:8px;cursor:pointer;user-select:none;text-align:right;" onclick="expGrid.sortBy('amount')">Сумма ${expGrid.sortCol==='amount'?(expGrid.sortAsc?'▲':'▼'):''}</th>
+              <th style="padding:8px;cursor:pointer;user-select:none;" onclick="expGrid.sortBy('description')">Описание</th>
+              <th style="padding:8px;text-align:right;color:var(--accent2);font-size:11px;">Σ ${fmt(expGrid.getRows(visExp).reduce((s,e)=>s+Number(e.amount||0),0))}</th>
+              <th style="padding:8px;">
+                ${Object.values(expGrid.filters).some(v=>v)?`<button class="btn btn-danger" style="padding:2px 8px;font-size:10px;" onclick="expGrid.filters={};render();" title="Сбросить все фильтры">✕</button>`:''}
+              </th>
+            </tr>
+            <tr style="background:var(--bg3);">
+              <td></td>
+              <td style="padding:3px 4px;">
+                <input type="month" class="grid-cell" value="${expGrid.filters.date||''}" placeholder="мм.гггг"
+                  style="font-size:11px;" oninput="expGrid.filters.date=this.value;render();"/>
+              </td>
+              <td style="padding:3px 4px;">
+                <select class="grid-cell" style="font-size:11px;" onchange="expGrid.filters.type=this.value;render();">
+                  <option value="">Все типы</option>
+                  ${getExpTypes().map(t=>`<option value="${t}" ${t===expGrid.filters.type?'selected':''}>${t}</option>`).join('')}
+                </select>
+              </td>
+              <td style="padding:3px 4px;">
+                <input type="number" class="grid-cell" value="${expGrid.filters.amount_min||''}" placeholder="от ₸"
+                  style="font-size:11px;text-align:right;" oninput="expGrid.filters.amount_min=this.value;render();"/>
+              </td>
+              <td style="padding:3px 4px;">
+                <input type="text" class="grid-cell" value="${expGrid.filters.description||''}" placeholder="поиск..."
+                  style="font-size:11px;" oninput="expGrid.filters.description=this.value;render();"/>
+              </td>
+              <td></td><td></td>
+            </tr>
           </thead>
           <tbody>
             ${expGrid.getRows(visExp).map(e=>`
@@ -1130,14 +1143,18 @@ const bankGrid = {
   sortCol:'date', sortAsc:false,
   selected: new Set(),
   activeFilter:'', filterVal:'',
+  filters: {},
 
   getRows(rows){
     let f=[...rows];
-    if(this.filterVal){
-      if(this.activeFilter==='category') f=f.filter(t=>t.category===this.filterVal);
-      else if(this.activeFilter==='firm') f=f.filter(t=>t.doc_no===this.filterVal);
-      else if(this.activeFilter==='type') f=f.filter(t=>t.txType===this.filterVal);
-    }
+    Object.entries(this.filters).forEach(([col,val])=>{
+      if(!val) return;
+      if(col==='debit_min') f=f.filter(t=>Number(t.debit||0)>=Number(val));
+      else if(col==='debit_max') f=f.filter(t=>Number(t.debit||0)<=Number(val));
+      else if(col==='credit_min') f=f.filter(t=>Number(t.credit||0)>=Number(val));
+      else if(col==='is_expense') f=f.filter(t=>val==='yes'?t.is_expense:!t.is_expense);
+      else f=f.filter(t=>String(t[col]||'').toLowerCase().includes(val.toLowerCase()));
+    });
     const col=this.sortCol, asc=this.sortAsc;
     f.sort((a,b)=>{
       let va=a[col]||'', vb=b[col]||'';
@@ -1356,42 +1373,77 @@ function renderBank(){
 
 <thead>
           <tr>
-            <th style="padding:8px;text-align:center;width:4%;">
+            <th style="padding:8px;text-align:center;width:3%;">
               <input type="checkbox" onchange="bankGrid.selectAll(this.checked,sortedBk||[])" style="cursor:pointer;"/>
             </th>
-            <th style="padding:8px;cursor:pointer;width:8%;" onclick="bankGrid.sortBy('doc_no')">Фирма ${bankGrid.sortCol==='doc_no'?(bankGrid.sortAsc?'▲':'▼'):''} <span style="font-size:9px;color:var(--text3);" onclick="event.stopPropagation();bankGrid.toggleFilter('firm')">▼</span></th>
+            <th style="padding:8px;cursor:pointer;width:7%;" onclick="bankGrid.sortBy('doc_no')">Фирма ${bankGrid.sortCol==='doc_no'?(bankGrid.sortAsc?'▲':'▼'):''}</th>
             <th style="padding:8px;cursor:pointer;width:9%;" onclick="bankGrid.sortBy('date')">Дата ${bankGrid.sortCol==='date'?(bankGrid.sortAsc?'▲':'▼'):''}</th>
-            <th style="padding:8px;cursor:pointer;text-align:right;width:10%;" onclick="bankGrid.sortBy('debit')">Дебет ${bankGrid.sortCol==='debit'?(bankGrid.sortAsc?'▲':'▼'):''}</th>
-            <th style="padding:8px;cursor:pointer;text-align:right;width:10%;" onclick="bankGrid.sortBy('credit')">Кредит ${bankGrid.sortCol==='credit'?(bankGrid.sortAsc?'▲':'▼'):''}</th>
-            <th style="padding:8px;width:13%;">Контрагент</th>
-            <th style="padding:8px;width:16%;">Назначение</th>
-            <th style="padding:8px;cursor:pointer;width:9%;" onclick="bankGrid.sortBy('category')">Категория <span style="font-size:9px;color:var(--text3);" onclick="event.stopPropagation();bankGrid.toggleFilter('category')">▼</span></th>
+            <th style="padding:8px;cursor:pointer;text-align:right;width:9%;" onclick="bankGrid.sortBy('debit')">Дебет ${bankGrid.sortCol==='debit'?(bankGrid.sortAsc?'▲':'▼'):''}</th>
+            <th style="padding:8px;cursor:pointer;text-align:right;width:9%;" onclick="bankGrid.sortBy('credit')">Кредит ${bankGrid.sortCol==='credit'?(bankGrid.sortAsc?'▲':'▼'):''}</th>
+            <th style="padding:8px;width:12%;">Контрагент</th>
+            <th style="padding:8px;width:14%;">Назначение</th>
+            <th style="padding:8px;cursor:pointer;width:8%;" onclick="bankGrid.sortBy('category')">Категория</th>
             <th style="padding:8px;width:8%;">Точка</th>
-            <th style="padding:8px;width:10%;">Тип расхода</th>
-            <th style="padding:8px;width:6%;">Расход?</th>
-            <th style="padding:8px;width:7%;">Статус</th>
-            <th style="width:5%;"></th>
+            <th style="padding:8px;width:9%;">Тип расхода</th>
+            <th style="padding:8px;width:5%;">Расход?</th>
+            <th style="padding:8px;width:6%;">Статус</th>
+            <th style="width:4%;">
+              ${Object.values(bankGrid.filters).some(v=>v)?`<button class="btn btn-danger" style="padding:2px 6px;font-size:10px;" onclick="bankGrid.filters={};render();" title="Сбросить">✕</button>`:''}
+            </th>
           </tr>
-          ${bankGrid.activeFilter?`<tr style="background:var(--bg3);">
+          <tr style="background:var(--bg3);">
             <td></td>
-            <td colspan="11" style="padding:6px 8px;">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:11px;color:var(--text2);">Фильтр:</span>
-                ${bankGrid.activeFilter==='firm'?
-                  `<select class="form-control" style="width:200px;font-size:12px;" onchange="bankGrid.filterVal=this.value;render();">
-                    <option value="">Все фирмы</option>
-                    ${allFirms.map(f=>`<option value="${f}" ${f===bankGrid.filterVal?'selected':''}>${f}</option>`).join('')}
-                  </select>`
-                  :`<select class="form-control" style="width:200px;font-size:12px;" onchange="bankGrid.filterVal=this.value;render();">
-                    <option value="">Все категории</option>
-                    ${allCats.map(cat=>`<option value="${cat}" ${cat===bankGrid.filterVal?'selected':''}>${cat}</option>`).join('')}
-                  </select>`}
-                ${bankGrid.filterVal?`<button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="bankGrid.filterVal='';render();">✕</button>`:''}
-                <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="bankGrid.activeFilter='';render();">Закрыть</button>
-              </div>
+            <td style="padding:3px 4px;">
+              <input type="text" class="grid-cell" value="${bankGrid.filters.doc_no||''}" placeholder="фирма..."
+                style="font-size:11px;" oninput="bankGrid.filters.doc_no=this.value;render();"/>
             </td>
-            <td></td>
-          </tr>`:''}
+            <td style="padding:3px 4px;">
+              <input type="month" class="grid-cell" value="${bankGrid.filters.date||''}"
+                style="font-size:11px;" oninput="bankGrid.filters.date=this.value;render();"/>
+            </td>
+            <td style="padding:3px 4px;">
+              <input type="number" class="grid-cell" value="${bankGrid.filters.debit_min||''}" placeholder="от ₸"
+                style="font-size:11px;text-align:right;" oninput="bankGrid.filters.debit_min=this.value;render();"/>
+            </td>
+            <td style="padding:3px 4px;">
+              <input type="number" class="grid-cell" value="${bankGrid.filters.credit_min||''}" placeholder="от ₸"
+                style="font-size:11px;text-align:right;" oninput="bankGrid.filters.credit_min=this.value;render();"/>
+            </td>
+            <td style="padding:3px 4px;">
+              <input type="text" class="grid-cell" value="${bankGrid.filters.counterpart||''}" placeholder="поиск..."
+                style="font-size:11px;" oninput="bankGrid.filters.counterpart=this.value;render();"/>
+            </td>
+            <td style="padding:3px 4px;">
+              <input type="text" class="grid-cell" value="${bankGrid.filters.purpose||''}" placeholder="поиск..."
+                style="font-size:11px;" oninput="bankGrid.filters.purpose=this.value;render();"/>
+            </td>
+            <td style="padding:3px 4px;">
+              <select class="grid-cell" style="font-size:11px;" onchange="bankGrid.filters.category=this.value;render();">
+                <option value="">Все</option>
+                ${allCats.map(cat=>`<option value="${cat}" ${cat===bankGrid.filters.category?'selected':''}>${cat}</option>`).join('')}
+              </select>
+            </td>
+            <td style="padding:3px 4px;">
+              <select class="grid-cell" style="font-size:11px;" onchange="bankGrid.filters.point_id=this.value;render();">
+                <option value="">Все</option>
+                ${POINTS.map(p=>`<option value="${p.id}" ${p.id===bankGrid.filters.point_id?'selected':''}>${p.short}</option>`).join('')}
+              </select>
+            </td>
+            <td style="padding:3px 4px;">
+              <select class="grid-cell" style="font-size:11px;" onchange="bankGrid.filters.expense_type=this.value;render();">
+                <option value="">Все</option>
+                ${getExpTypes().map(t=>`<option value="${t}" ${t===bankGrid.filters.expense_type?'selected':''}>${t}</option>`).join('')}
+              </select>
+            </td>
+            <td style="padding:3px 4px;text-align:center;">
+              <select class="grid-cell" style="font-size:11px;" onchange="bankGrid.filters.is_expense=this.value;render();">
+                <option value="">Все</option>
+                <option value="yes" ${'yes'===bankGrid.filters.is_expense?'selected':''}>✓ Да</option>
+                <option value="no" ${'no'===bankGrid.filters.is_expense?'selected':''}>— Нет</option>
+              </select>
+            </td>
+            <td></td><td></td>
+          </tr>
         </thead>
     <tbody>${rows||'<tr><td colspan="13"><div class="empty">Нет операций. Загрузите выписку.</div></td></tr>'}</tbody>
     </table></div>
@@ -1836,9 +1888,14 @@ let passModal = null;
 // ─── STAFF STATE ──────────────────────────────────────────────────────────────
 let staffData = [];
 let staffLoaded = false;
-let staffModal = null;   // new employee modal
-let advanceModal = null; // {employeeId, name}
-let salPayModal = null;  // salary payment modal // {userId, name}
+let staffModal = null;
+let advanceModal = null;
+let salPayModal = null;
+let staffSearch = '';
+let staffFilter = '';  // point_id filter
+let staffView = 'table'; // table | cards
+let staffImportData = [];
+let staffImportMode = false; // {userId, name}
 
 function renderUsers(){
   if(!usersLoaded){
@@ -2211,6 +2268,23 @@ function bindEvents(accessPoints){
   });
   document.getElementById('report-days')?.addEventListener('change',e=>{reportState.days=e.target.value;render();});
 
+  // Staff import save
+  document.getElementById('staff-import-save')?.addEventListener('click',async()=>{
+    if(!staffImportData.length) return;
+    const btn=document.getElementById('staff-import-save');
+    btn.disabled=true;btn.textContent='Сохранение...';
+    let saved=0,errors=0;
+    for(let i=0;i<staffImportData.length;i+=20){
+      const batch=staffImportData.slice(i,i+20);
+      const {error}=await sb.from('staff').insert(batch);
+      if(error) errors+=batch.length;
+      else saved+=batch.length;
+    }
+    staffImportMode=false;staffImportData=[];staffLoaded=false;
+    await loadAll();
+    showAlert(errors>0?'error':'success',`✓ Добавлено ${saved} сотрудников${errors>0?', ошибок: '+errors:''}`);
+  });
+
   // Staff page
   document.getElementById('add-emp-btn')?.addEventListener('click',()=>{staffModal={};render();});
   document.getElementById('staff-modal-close')?.addEventListener('click',()=>{staffModal=null;render();});
@@ -2445,473 +2519,302 @@ function renderStaff(){
       sb.from('staff_advances').select('*').order('date',{ascending:false}),
       sb.from('staff_salary_payments').select('*').order('date',{ascending:false}),
     ]).then(([s,a,p])=>{
-      staffData = {
-        employees: s.data||[],
-        advances: a.data||[],
-        payments: p.data||[],
-      };
-      staffLoaded=true;
-      render();
+      staffData={employees:s.data||[],advances:a.data||[],payments:p.data||[]};
+      staffLoaded=true;render();
     });
     return '<div class="loading-screen" style="min-height:200px;"><div class="spinner"></div></div>';
   }
 
-  const {employees, advances, payments} = staffData;
+  const {employees,advances,payments}=staffData;
+
+  // Filter & search
+  let filtered=employees;
+  if(staffFilter) filtered=filtered.filter(e=>e.point_id===staffFilter);
+  if(staffSearch) filtered=filtered.filter(e=>
+    e.name?.toLowerCase().includes(staffSearch.toLowerCase())||
+    e.position?.toLowerCase().includes(staffSearch.toLowerCase())
+  );
 
   // Summary per employee
-  const empSummary = employees.map(emp=>{
-    const empAdv = advances.filter(a=>a.employee_id===emp.id);
-    const empPay = payments.filter(p=>p.employee_id===emp.id);
-    const totalAdvances = empAdv.reduce((s,a)=>s+Number(a.amount||0),0);
-    const totalPaid = empPay.reduce((s,p)=>s+Number(p.amount||0),0);
-    const totalOwed = totalAdvances + totalPaid; // what's been given
-    const remaining = Number(emp.monthly_salary||0) - totalOwed % Number(emp.monthly_salary||1);
-    const netRemaining = Number(emp.monthly_salary||0) - (totalAdvances + totalPaid) % (Number(emp.monthly_salary||1)||1);
-    // simpler: this month
-    const thisMonth = new Date().toISOString().slice(0,7);
-    const monthAdv = empAdv.filter(a=>a.date?.startsWith(thisMonth)).reduce((s,a)=>s+Number(a.amount||0),0);
-    const monthPay = empPay.filter(p=>p.date?.startsWith(thisMonth)).reduce((s,p)=>s+Number(p.amount||0),0);
-    const monthRemaining = Number(emp.monthly_salary||0) - monthAdv - monthPay;
-    return {...emp, totalAdvances, totalPaid, monthAdv, monthPay, monthRemaining};
+  const now=new Date();
+  const curMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const empSummary=filtered.map(emp=>{
+    const monthAdv=advances.filter(a=>a.employee_id===emp.id&&a.date?.startsWith(curMonth)).reduce((s,a)=>s+Number(a.amount||0),0);
+    const monthPay=payments.filter(p=>p.employee_id===emp.id&&p.date?.startsWith(curMonth)).reduce((s,p)=>s+Number(p.amount||0),0);
+    const monthRem=Number(emp.monthly_salary||0)-monthAdv-monthPay;
+    return {...emp,monthAdv,monthPay,monthRem};
   });
 
-  const totalSalaryBudget = employees.reduce((s,e)=>s+Number(e.monthly_salary||0),0);
-  const totalAdvancesGiven = advances.reduce((s,a)=>s+Number(a.amount||0),0);
-  const totalPaidOut = payments.reduce((s,p)=>s+Number(p.amount||0),0);
+  const totalSalary=employees.reduce((s,e)=>s+Number(e.monthly_salary||0),0);
+  const totalAdv=advances.filter(a=>a.date?.startsWith(curMonth)).reduce((s,a)=>s+Number(a.amount||0),0);
+  const totalPay=payments.filter(p=>p.date?.startsWith(curMonth)).reduce((s,p)=>s+Number(p.amount||0),0);
 
-  const empCards = empSummary.map(emp=>`
-    <div class="table-card" style="margin-bottom:14px;">
-      <div class="table-head">
-        <div>
-          <h3 style="font-size:14px;">👤 ${emp.name}</h3>
-          <span style="font-size:11px;color:var(--text3);">${POINTS.find(p=>p.id===emp.point_id)?.name||'—'} · ${emp.position||'—'}</span>
+  const tableRows=empSummary.map(emp=>`
+    <tr style="border-top:1px solid var(--border);">
+      <td style="padding:8px 10px;">
+        <div style="font-weight:600;font-size:13px;">${emp.name}</div>
+        <div style="font-size:11px;color:var(--text3);">${emp.position||'—'}</div>
+      </td>
+      <td style="padding:8px 10px;">
+        <span class="badge badge-b">${POINTS.find(p=>p.id===emp.point_id)?.short||'—'}</span>
+      </td>
+      <td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--accent);">${fmt(emp.monthly_salary)}</td>
+      <td style="padding:8px 10px;text-align:right;color:var(--accent2);">${emp.monthAdv>0?fmt(emp.monthAdv):'—'}</td>
+      <td style="padding:8px 10px;text-align:right;color:#60a5fa;">${emp.monthPay>0?fmt(emp.monthPay):'—'}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:600;color:${emp.monthRem>0?'var(--accent3)':emp.monthRem<0?'var(--accent2)':'var(--text3)'};">${fmt(emp.monthRem)}</td>
+      <td style="padding:6px 8px;">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" data-advance-emp="${emp.id}" data-advance-name="${emp.name}">💰</button>
+          <button class="btn btn-success" style="padding:3px 8px;font-size:11px;" data-salpay-emp="${emp.id}" data-salpay-name="${emp.name}">✅</button>
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:11px;" onclick="showStaffHistory('${emp.id}')">📋</button>
+          <button class="btn btn-danger" style="padding:3px 8px;font-size:11px;" data-del-emp="${emp.id}">✕</button>
         </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-ghost" style="font-size:11px;" data-advance-emp="${emp.id}" data-advance-name="${emp.name}">💰 Авансировать</button>
-          <button class="btn btn-success" style="font-size:11px;" data-salpay-emp="${emp.id}" data-salpay-name="${emp.name}">✅ Выдать зарплату</button>
-          <button class="btn btn-danger" style="font-size:11px;" data-del-emp="${emp.id}">✕</button>
-        </div>
-      </div>
-      <div style="padding:16px;">
-        <div class="stats-grid" style="margin-bottom:14px;">
-          <div class="stat-card"><div class="stat-label">Оклад (месяц)</div><div class="stat-value y" style="font-size:16px;">${fmt(emp.monthly_salary)}</div></div>
-          <div class="stat-card"><div class="stat-label">Авансы (этот месяц)</div><div class="stat-value r" style="font-size:16px;">${fmt(emp.monthAdv)}</div></div>
-          <div class="stat-card"><div class="stat-label">Выдано зарплаты</div><div class="stat-value b" style="font-size:16px;">${fmt(emp.monthPay)}</div></div>
-          <div class="stat-card" style="border-color:${emp.monthRemaining>=0?'rgba(16,185,129,.3)':'rgba(239,68,68,.3)'};">
-            <div class="stat-label">Остаток к выдаче</div>
-            <div class="stat-value" style="font-size:16px;color:${emp.monthRemaining>=0?'var(--accent3)':'var(--accent2)'};">${fmt(emp.monthRemaining)}</div>
-          </div>
-        </div>
+      </td>
+    </tr>`).join('');
 
-        ${advances.filter(a=>a.employee_id===emp.id).length>0||payments.filter(p=>p.employee_id===emp.id).length>0?`
-        <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">История</div>
-        <div style="max-height:180px;overflow-y:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
-            <colgroup><col style="width:20%"><col style="width:20%"><col style="width:20%"><col style="width:40%"></colgroup>
-            <thead><tr style="background:var(--bg3);">
-              <th style="padding:6px 10px;text-align:left;">Дата</th>
-              <th style="padding:6px 10px;text-align:left;">Тип</th>
-              <th style="padding:6px 10px;text-align:right;">Сумма</th>
-              <th style="padding:6px 10px;">Описание</th>
-            </tr></thead>
-            <tbody>
-              ${[
-                ...advances.filter(a=>a.employee_id===emp.id).map(a=>`<tr style="border-top:1px solid var(--border);">
-                  <td style="padding:6px 10px;">${fmtDate(a.date)}</td>
-                  <td style="padding:6px 10px;"><span class="badge badge-r">Аванс</span></td>
-                  <td style="padding:6px 10px;text-align:right;color:var(--accent2);">${fmt(a.amount)}</td>
-                  <td style="padding:6px 10px;color:var(--text3);">${a.note||'—'}</td>
-                </tr>`),
-                ...payments.filter(p=>p.employee_id===emp.id).map(p=>`<tr style="border-top:1px solid var(--border);">
-                  <td style="padding:6px 10px;">${fmtDate(p.date)}</td>
-                  <td style="padding:6px 10px;"><span class="badge badge-g">Зарплата</span></td>
-                  <td style="padding:6px 10px;text-align:right;color:var(--accent3);">${fmt(p.amount)}</td>
-                  <td style="padding:6px 10px;color:var(--text3);">${p.note||'—'}</td>
-                </tr>`)
-              ].join('')}
-            </tbody>
-          </table>
-        </div>`:
-        '<div style="color:var(--text3);font-size:12px;padding:8px 0;">Нет истории операций</div>'}
-      </div>
-    </div>
-  `).join('');
-
-  // Add employee modal
-  const newEmpModal = staffModal ? `
-    <div class="modal-overlay" id="staff-modal-overlay">
-      <div class="modal">
-        <div class="modal-head"><h3>➕ Новый сотрудник</h3><button class="close-btn" id="staff-modal-close">✕</button></div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-group"><label>ФИО</label><input class="form-control" id="emp-name" placeholder="Имя Фамилия"/></div>
-            <div class="form-group"><label>Должность</label><input class="form-control" id="emp-position" placeholder="Продавец, Кассир..."/></div>
-            <div class="form-group"><label>Точка</label>
-              <select class="form-control" id="emp-point">
-                <option value="">— выберите —</option>
-                ${POINTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}
-              </select>
-            </div>
-            <div class="form-group"><label>Оклад (месяц) ₸</label><input type="number" class="form-control" id="emp-salary" placeholder="0"/></div>
-            <div class="form-group"><label>Телефон</label><input class="form-control" id="emp-phone" placeholder="+7..."/></div>
-            <div class="form-group"><label>Дата найма</label><input type="date" class="form-control" id="emp-hire" value="${today()}"/></div>
-          </div>
-        </div>
-        <div class="modal-foot">
-          <button class="btn btn-ghost" id="staff-modal-close2">Отмена</button>
-          <button class="btn btn-primary" id="emp-save-btn">Добавить</button>
-        </div>
-      </div>
-    </div>` : '';
-
-  // Advance modal
-  const advModal = advanceModal ? `
-    <div class="modal-overlay" id="advance-modal-overlay">
-      <div class="modal">
-        <div class="modal-head"><h3>💰 Аванс — ${advanceModal.name}</h3><button class="close-btn" id="advance-close">✕</button></div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="adv-date" value="${today()}"/></div>
-            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="adv-amount" placeholder="0"/></div>
-            <div class="form-group" style="grid-column:1/-1;"><label>Примечание</label><input class="form-control" id="adv-note" placeholder="Необязательно"/></div>
-          </div>
-        </div>
-        <div class="modal-foot">
-          <button class="btn btn-ghost" id="advance-close2">Отмена</button>
-          <button class="btn btn-primary" id="adv-save-btn">Сохранить</button>
-        </div>
-      </div>
-    </div>` : '';
-
-  // Salary payment modal
-  const salPayModalHtml = salPayModal ? `
-    <div class="modal-overlay" id="salpay-modal-overlay">
-      <div class="modal">
-        <div class="modal-head"><h3>✅ Выдача зарплаты — ${salPayModal.name}</h3><button class="close-btn" id="salpay-close">✕</button></div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="salpay-date" value="${today()}"/></div>
-            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="salpay-amount" placeholder="0"/></div>
-            <div class="form-group" style="grid-column:1/-1;"><label>Примечание</label><input class="form-control" id="salpay-note" placeholder="Необязательно"/></div>
-          </div>
-        </div>
-        <div class="modal-foot">
-          <button class="btn btn-ghost" id="salpay-close2">Отмена</button>
-          <button class="btn btn-primary" id="salpay-save-btn">Сохранить</button>
-        </div>
-      </div>
-    </div>` : '';
+  // History modal
+  const histModal = staffData._histEmpId ? renderStaffHistory(staffData._histEmpId) : '';
 
   return `
-    <div class="stats-grid" style="margin-bottom:20px;">
+    <div class="stats-grid" style="margin-bottom:16px;">
       <div class="stat-card"><div class="stat-label">Сотрудников</div><div class="stat-value y">${employees.length}</div></div>
-      <div class="stat-card"><div class="stat-label">Фонд зарплат</div><div class="stat-value b">${fmt(totalSalaryBudget)}</div><div class="stat-sub">в месяц</div></div>
-      <div class="stat-card"><div class="stat-label">Выдано авансов</div><div class="stat-value r">${fmt(totalAdvancesGiven)}</div></div>
-      <div class="stat-card"><div class="stat-label">Выдано зарплат</div><div class="stat-value g">${fmt(totalPaidOut)}</div></div>
+      <div class="stat-card"><div class="stat-label">Фонд (месяц)</div><div class="stat-value b">${fmt(totalSalary)}</div></div>
+      <div class="stat-card"><div class="stat-label">Авансы (${curMonth})</div><div class="stat-value r">${fmt(totalAdv)}</div></div>
+      <div class="stat-card"><div class="stat-label">Выдано (${curMonth})</div><div class="stat-value g">${fmt(totalPay)}</div></div>
     </div>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
-      <button class="btn btn-primary" id="add-emp-btn">➕ Добавить сотрудника</button>
+
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+      <input type="text" class="form-control" value="${staffSearch}" placeholder="🔍 Поиск по имени, должности..."
+        style="flex:1;min-width:200px;" oninput="staffSearch=this.value;render();"/>
+      <select class="form-control" style="width:160px;" onchange="staffFilter=this.value;render();">
+        <option value="">Все точки</option>
+        ${POINTS.map(p=>`<option value="${p.id}" ${p.id===staffFilter?'selected':''}>${p.name}</option>`).join('')}
+      </select>
+      <label class="btn btn-ghost" style="cursor:pointer;font-size:12px;">
+        📥 Импорт Excel
+        <input type="file" accept=".xlsx,.xls" style="display:none;" onchange="handleStaffImport(this);this.value='';"/>
+      </label>
+      <button class="btn btn-ghost" style="font-size:12px;" onclick="downloadStaffTemplate()">📋 Шаблон</button>
+      <button class="btn btn-primary" id="add-emp-btn">➕ Добавить</button>
     </div>
-    ${employees.length===0?'<div class="empty">Нет сотрудников. Добавьте первого.</div>':empCards}
-    ${newEmpModal}${advModal}${salPayModalHtml}
+
+    ${staffImportMode?`
+    <div class="table-card" style="margin-bottom:14px;border-color:var(--accent3);">
+      <div class="table-head">
+        <h3 style="color:var(--accent3);">📥 Импорт персонала — ${staffImportData.length} чел.</h3>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" onclick="staffImportMode=false;staffImportData=[];render();">✕</button>
+          <button class="btn btn-primary" id="staff-import-save">💾 Сохранить всех</button>
+        </div>
+      </div>
+      <div style="max-height:250px;overflow-y:auto;padding:12px;">
+        ${staffImportData.map(e=>`<div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);">
+          <span style="flex:2;font-size:12px;font-weight:600;">${e.name}</span>
+          <span style="flex:1;font-size:11px;color:var(--text3);">${e.position||'—'}</span>
+          <span class="badge badge-b" style="flex:0;">${POINTS.find(p=>p.id===e.point_id)?.short||'?'}</span>
+          <span style="font-size:12px;color:var(--accent);flex:1;text-align:right;">${fmt(e.monthly_salary)}</span>
+        </div>`).join('')}
+      </div>
+    </div>`:''}
+
+    <div class="table-card">
+      <div class="table-head">
+        <h3>Персонал (${filtered.length}${filtered.length!==employees.length?' из '+employees.length:''})</h3>
+        <span style="font-size:11px;color:var(--text3);">💰=Аванс · ✅=Зарплата · 📋=История</span>
+      </div>
+      <div class="table-scroll">
+        <table style="table-layout:fixed;width:100%;min-width:700px;">
+          <colgroup><col style="width:24%"><col style="width:10%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:13%"><col style="width:18%"></colgroup>
+          <thead><tr style="background:var(--bg3);">
+            <th style="padding:8px 10px;">Имя / Должность</th>
+            <th style="padding:8px 10px;">Точка</th>
+            <th style="padding:8px 10px;text-align:right;">Оклад</th>
+            <th style="padding:8px 10px;text-align:right;">Авансы</th>
+            <th style="padding:8px 10px;text-align:right;">Выдано</th>
+            <th style="padding:8px 10px;text-align:right;">Остаток</th>
+            <th style="padding:8px 10px;">Действия</th>
+          </tr></thead>
+          <tbody>
+            ${tableRows||'<tr><td colspan="7"><div class="empty">Нет сотрудников</div></td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    ${staffModal?renderNewEmpModal():''}
+    ${advanceModal?renderAdvanceModal():''}
+    ${salPayModal?renderSalPayModal():''}
+    ${histModal}
   `;
 }
 
+function showStaffHistory(empId){
+  staffData._histEmpId = staffData._histEmpId===empId?null:empId;
+  render();
+}
 
-// ─── CARİLER (ДОЛЖНИКИ) ───────────────────────────────────────────────────────
-// Bank filters
-let bankFilter = {dateFrom:'', dateTo:'', category:'', counterpart:'', firm:'', txType:''};
-
-let carilerData = [];
-let carilerLoaded = false;
-let carilerModal = null;   // new debtor
-let paymentModal = null;   // record payment
-let carilerPoint = '';     // selected point
-
-function renderCariler(){
-  const accessPoints = STATE.user.role==='admin'
-    ? POINTS.filter(p=>['mkr17','mkr5','baza'].includes(p.id))
-    : POINTS.filter(p=>p.id===STATE.user.point_id&&['mkr17','mkr5','baza'].includes(p.id));
-
-  if(!carilerPoint && accessPoints[0]) carilerPoint = accessPoints[0].id;
-
-  if(!carilerLoaded){
-    Promise.all([
-      sb.from('debtors').select('*').order('name'),
-      sb.from('debtor_payments').select('*').order('date',{ascending:false}),
-    ]).then(([d,p])=>{
-      carilerData = {debtors: d.data||[], payments: p.data||[]};
-      carilerLoaded = true;
-      render();
-    });
-    return '<div class="loading-screen" style="min-height:200px;"><div class="spinner"></div></div>';
-  }
-
-  const {debtors, payments} = carilerData;
-
-  // Filter by selected point
-  const ptDebtors = debtors.filter(d=>d.point_id===carilerPoint);
-
-  // Enrich with payment history
-  const enriched = ptDebtors.map(d=>{
-    const dPay = payments.filter(p=>p.debtor_id===d.id);
-    const totalPaid = dPay.reduce((s,p)=>s+Number(p.amount||0),0);
-    const remaining = Number(d.total_debt||0) - totalPaid;
-    return {...d, totalPaid, remaining, payments: dPay};
-  });
-
-  const totalDebt = enriched.reduce((s,d)=>s+Number(d.total_debt||0),0);
-  const totalPaid = enriched.reduce((s,d)=>s+d.totalPaid,0);
-  const totalRemaining = enriched.reduce((s,d)=>s+d.remaining,0);
-
-  // Point tabs
-  const tabs = accessPoints.map(p=>`
-    <div class="tab ${carilerPoint===p.id?'active':''}" onclick="carilerPoint='${p.id}';carilerLoaded=false;render();">
-      ${p.name}
-    </div>`).join('');
-
-  // Debtor cards
-  const debtorCards = enriched.length===0
-    ? '<div class="empty">Нет должников для этой точки</div>'
-    : enriched.sort((a,b)=>b.remaining-a.remaining).map(d=>`
-    <div class="table-card" style="margin-bottom:12px;">
-      <div class="table-head">
-        <div>
-          <h3 style="font-size:14px;">👤 ${d.name}</h3>
-          <span style="font-size:11px;color:var(--text3);">${d.phone||'—'} · ${fmtDate(d.date)}</span>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div style="text-align:right;margin-right:8px;">
-            <div style="font-size:10px;color:var(--text3);">Остаток долга</div>
-            <div style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:${d.remaining>0?'var(--accent2)':d.remaining<0?'var(--accent3)':'var(--text3)'};">${fmt(d.remaining)}</div>
-          </div>
-          ${d.remaining>0?`<button class="btn btn-success" style="font-size:11px;" onclick="paymentModal={id:'${d.id}',name:'${d.name}',remaining:${d.remaining}};render();">💵 Оплата</button>`:'<span class="badge badge-g">✅ Погашен</span>'}
-          <button class="btn btn-danger" style="font-size:11px;" onclick="if(confirm('Удалить?')){sb.from('debtor_payments').delete().eq('debtor_id','${d.id}').then(()=>sb.from('debtors').delete().eq('id','${d.id}').then(()=>{carilerLoaded=false;render();}));}">✕</button>
-        </div>
-      </div>
-      <div style="padding:12px 16px;">
-        <div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
-          <div><span style="font-size:10px;color:var(--text3);">Общий долг:</span> <b style="color:var(--accent2);">${fmt(d.total_debt)}</b></div>
-          <div><span style="font-size:10px;color:var(--text3);">Оплачено:</span> <b style="color:var(--accent3);">${fmt(d.totalPaid)}</b></div>
-          ${d.description?`<div><span style="font-size:10px;color:var(--text3);">Описание:</span> <span style="font-size:12px;">${d.description}</span></div>`:''}
-        </div>
-        ${d.payments.length>0?`
-        <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;">История оплат</div>
-        <div style="display:flex;flex-direction:column;gap:4px;">
-          ${d.payments.map(p=>`
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--bg3);border-radius:6px;font-size:12px;">
-              <span style="color:var(--text2);">${fmtDate(p.date)}</span>
-              <span style="color:var(--accent3);font-weight:600;">+${fmt(p.amount)}</span>
-              <span style="color:var(--text3);">${p.note||''}</span>
-            </div>`).join('')}
-        </div>`:''}
-      </div>
-    </div>`).join('');
-
-  // New debtor modal
-  const newModal = carilerModal ? `
-    <div class="modal-overlay" id="caril-modal-overlay">
-      <div class="modal">
-        <div class="modal-head"><h3>➕ Новый должник</h3><button class="close-btn" onclick="carilerModal=null;render();">✕</button></div>
-        <div class="modal-body">
-          <div class="form-grid">
-            <div class="form-group"><label>ФИО / Название</label><input class="form-control" id="c-name" placeholder="Имя должника"/></div>
-            <div class="form-group"><label>Телефон</label><input class="form-control" id="c-phone" placeholder="+7..."/></div>
-            <div class="form-group"><label>Сумма долга ₸</label><input type="number" class="form-control" id="c-debt" placeholder="0"/></div>
-            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="c-date" value="${today()}"/></div>
-            <div class="form-group" style="grid-column:1/-1;"><label>Описание</label><input class="form-control" id="c-desc" placeholder="Товар, причина долга..."/></div>
-          </div>
-        </div>
-        <div class="modal-foot">
-          <button class="btn btn-ghost" onclick="carilerModal=null;render();">Отмена</button>
-          <button class="btn btn-primary" id="caril-save-btn">Добавить</button>
-        </div>
-      </div>
-    </div>` : '';
-
-  // Payment modal
-  const payModal = paymentModal ? `
-    <div class="modal-overlay" id="pay-modal-overlay">
-      <div class="modal">
-        <div class="modal-head"><h3>💵 Оплата долга — ${paymentModal.name}</h3><button class="close-btn" onclick="paymentModal=null;render();">✕</button></div>
-        <div class="modal-body">
-          <div class="alert alert-warn">Остаток долга: <b>${fmt(paymentModal.remaining)}</b></div>
-          <div class="form-grid">
-            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="pay-date" value="${today()}"/></div>
-            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="pay-amount" placeholder="0" value="${paymentModal.remaining}"/></div>
-            <div class="form-group" style="grid-column:1/-1;"><label>Примечание</label><input class="form-control" id="pay-note" placeholder="Необязательно"/></div>
-          </div>
-        </div>
-        <div class="modal-foot">
-          <button class="btn btn-ghost" onclick="paymentModal=null;render();">Отмена</button>
-          <button class="btn btn-primary" id="pay-save-btn">Сохранить</button>
-        </div>
-      </div>
-    </div>` : '';
-
+function renderStaffHistory(empId){
+  const emp = staffData.employees.find(e=>e.id===empId);
+  if(!emp) return '';
+  const advs = staffData.advances.filter(a=>a.employee_id===empId);
+  const pays = staffData.payments.filter(p=>p.employee_id===empId);
+  const all = [
+    ...advs.map(a=>({...a,_type:'Аванс'})),
+    ...pays.map(p=>({...p,_type:'Зарплата'})),
+  ].sort((a,b)=>b.date?.localeCompare(a.date));
   return `
-    <div class="alert alert-warn" style="margin-bottom:16px;">
-      ℹ️ Карточки должников не влияют на расчёт прибыли — только для учёта.
-    </div>
-    <div class="stats-grid" style="margin-bottom:20px;">
-      <div class="stat-card"><div class="stat-label">Должников</div><div class="stat-value y">${enriched.length}</div></div>
-      <div class="stat-card"><div class="stat-label">Общий долг</div><div class="stat-value r">${fmt(totalDebt)}</div></div>
-      <div class="stat-card"><div class="stat-label">Оплачено</div><div class="stat-value g">${fmt(totalPaid)}</div></div>
-      <div class="stat-card" style="border-color:${totalRemaining>0?'rgba(239,68,68,.3)':'rgba(16,185,129,.3)'};">
-        <div class="stat-label">Остаток долга</div>
-        <div class="stat-value" style="color:${totalRemaining>0?'var(--accent2)':'var(--accent3)'};">${fmt(totalRemaining)}</div>
-      </div>
-    </div>
-    <div class="tabs" style="margin-bottom:16px;">${tabs}</div>
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
-      <button class="btn btn-primary" onclick="carilerModal={};render();">➕ Добавить должника</button>
-    </div>
-    ${debtorCards}
-    ${newModal}${payModal}
-  `;
-}
-
-
-// ─── TARGETS / BUDGET ────────────────────────────────────────────────────────
-// Targets stored in STATE for current session, synced to Supabase
-async function loadTargets(){
-  const {data} = await sb.from('targets').select('*');
-  const t = {};
-  (data||[]).forEach(row=>{
-    if(!t[row.point_id]) t[row.point_id]={};
-    t[row.point_id][row.metric] = row.value;
-  });
-  STATE.targets = t;
-  render();
-}
-function getTargets(){ return STATE.targets||{}; }
-async function saveTarget(pointId, metric, value){
-  const existing = await sb.from('targets').select('id').eq('point_id',pointId).eq('metric',metric).single();
-  if(existing.data){
-    await sb.from('targets').update({value:Number(value)}).eq('id',existing.data.id);
-  } else {
-    await sb.from('targets').insert({point_id:pointId, metric, value:Number(value)});
-  }
-  if(!STATE.targets) STATE.targets={};
-  if(!STATE.targets[pointId]) STATE.targets[pointId]={};
-  STATE.targets[pointId][metric] = value;
-  render();
-}
-
-function renderTargets(){
-  const targets = getTargets();
-  const now = new Date();
-  const curMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const editable = POINTS.filter(p=>p.id!=='ofis');
-
-  // Current month actuals per point
-  const ptData = editable.map(p=>{
-    const mEntries = STATE.entries.filter(e=>e.point_id===p.id&&e.date.startsWith(curMonth));
-    const sold = mEntries.reduce((s,e)=>s+Number(e.sold||0),0);
-    const bought = mEntries.reduce((s,e)=>s+Number(e.received||0),0);
-    const cats = CATS[p.id]||[];
-    const rem = cats.reduce((total,cat)=>{
-      const last = mEntries.filter(e=>e.category===cat).sort((a,b)=>b.date.localeCompare(a.date))[0];
-      return total+(last?Number(last.remaining||0):0);
-    },0);
-    const exp = STATE.expenses.filter(e=>e.point_id===p.id&&e.date.startsWith(curMonth)).reduce((s,e)=>s+Number(e.amount||0),0);
-    const staffIds = (STATE.staffCache||[]).filter(emp=>emp.point_id===p.id).map(e=>e.id);
-    const sal = [...(STATE.advancesCache||[]),...(STATE.salPayCache||[])].filter(x=>staffIds.includes(x.employee_id)&&x.date?.startsWith(curMonth)).reduce((s,e)=>s+Number(e.amount||0),0);
-    const profit = sold-bought-exp-sal+rem;
-    const tgt = (STATE.targets||{})[p.id]||{};
-    return {...p, sold, bought, rem, exp:exp+sal, profit,
-      targetSales: Number(tgt.sales||0),
-      targetProfit: Number(tgt.profit||0),
-      targetExpense: Number(tgt.expense||0)};
-  });
-
-  const totalSales   = ptData.reduce((s,p)=>s+p.sold,0);
-  const totalProfit  = ptData.reduce((s,p)=>s+p.profit,0);
-  const totalTgtSales = ptData.reduce((s,p)=>s+p.targetSales,0);
-  const totalTgtProfit = ptData.reduce((s,p)=>s+p.targetProfit,0);
-
-  const ptCards = ptData.map(p=>{
-    const salesPct  = p.targetSales>0  ? Math.min((p.sold/p.targetSales)*100,100).toFixed(0)   : null;
-    const profitPct = p.targetProfit>0 ? Math.min((p.profit/p.targetProfit)*100,100).toFixed(0) : null;
-    const expPct    = p.targetExpense>0 ? Math.min((p.exp/p.targetExpense)*100,100).toFixed(0)  : null;
-    const salesColor = salesPct>=100?'var(--accent3)':salesPct>=70?'var(--accent)':'var(--accent2)';
-    return `
-    <div class="table-card" style="margin-bottom:14px;">
+    <div class="table-card" style="margin-top:14px;border-color:var(--accent);">
       <div class="table-head">
-        <h3>📍 ${p.name}</h3>
-        <span style="font-size:11px;color:var(--text3);">${curMonth}</span>
+        <h3>📋 История — ${emp.name}</h3>
+        <button class="close-btn" onclick="staffData._histEmpId=null;render();">✕</button>
       </div>
-      <div style="padding:16px;">
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
-
-          <div class="stat-card" style="padding:14px;">
-            <div class="stat-label">Продажа / Цель</div>
-            <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0;">
-              <span style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:var(--accent);">${fmt(p.sold)}</span>
-              ${p.targetSales>0?`<span style="font-size:11px;color:var(--text3);">/ ${fmt(p.targetSales)}</span>`:''}
-            </div>
-            ${salesPct!==null?`
-            <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:4px;">
-              <div style="height:100%;width:${salesPct}%;background:${salesColor};border-radius:3px;transition:width .6s;"></div>
-            </div>
-            <span style="font-size:11px;color:${salesColor};font-weight:600;">${salesPct}% выполнено</span>`:'<span style="font-size:11px;color:var(--text3);">Цель не задана</span>'}
-          </div>
-
-          <div class="stat-card" style="padding:14px;border-color:${p.profit>=0?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'};">
-            <div class="stat-label">Прибыль / Цель</div>
-            <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0;">
-              <span style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:${p.profit>=0?'var(--accent3)':'var(--accent2)'};">${fmt(p.profit)}</span>
-              ${p.targetProfit>0?`<span style="font-size:11px;color:var(--text3);">/ ${fmt(p.targetProfit)}</span>`:''}
-            </div>
-            ${profitPct!==null?`
-            <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:4px;">
-              <div style="height:100%;width:${profitPct}%;background:${Number(profitPct)>=100?'var(--accent3)':Number(profitPct)>=70?'var(--accent)':'var(--accent2)'};border-radius:3px;"></div>
-            </div>
-            <span style="font-size:11px;color:var(--text3);font-weight:600;">${profitPct}% выполнено</span>`:'<span style="font-size:11px;color:var(--text3);">Цель не задана</span>'}
-          </div>
-
-          <div class="stat-card" style="padding:14px;">
-            <div class="stat-label">Расходы / Бюджет</div>
-            <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0;">
-              <span style="font-family:'Unbounded',sans-serif;font-size:16px;font-weight:700;color:var(--accent2);">${fmt(p.exp)}</span>
-              ${p.targetExpense>0?`<span style="font-size:11px;color:var(--text3);">/ ${fmt(p.targetExpense)}</span>`:''}
-            </div>
-            ${expPct!==null?`
-            <div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-bottom:4px;">
-              <div style="height:100%;width:${expPct}%;background:${Number(expPct)>=100?'var(--accent2)':Number(expPct)>=80?'var(--accent)':'var(--accent3)'};border-radius:3px;"></div>
-            </div>
-            <span style="font-size:11px;color:var(--text3);font-weight:600;">${expPct}% использовано</span>`:'<span style="font-size:11px;color:var(--text3);">Бюджет не задан</span>'}
-          </div>
-        </div>
-
-        <div style="border-top:1px solid var(--border);padding-top:12px;">
-          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;">Установить цели на месяц</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-            <div class="form-group" style="margin:0;"><label>Цель продаж ₸</label>
-              <input type="number" class="form-control" placeholder="0" value="${p.targetSales||''}"
-                onchange="saveTarget('${p.id}','sales',this.value);" style="font-size:12px;"/></div>
-            <div class="form-group" style="margin:0;"><label>Цель прибыли ₸</label>
-              <input type="number" class="form-control" placeholder="0" value="${p.targetProfit||''}"
-                onchange="saveTarget('${p.id}','profit',this.value);" style="font-size:12px;"/></div>
-            <div class="form-group" style="margin:0;"><label>Бюджет расходов ₸</label>
-              <input type="number" class="form-control" placeholder="0" value="${p.targetExpense||''}"
-                onchange="saveTarget('${p.id}','expense',this.value);" style="font-size:12px;"/></div>
-          </div>
-        </div>
+      <div style="max-height:300px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:var(--bg3);">
+            <th style="padding:8px;text-align:left;font-size:10px;color:var(--text2);">Дата</th>
+            <th style="padding:8px;text-align:left;font-size:10px;color:var(--text2);">Тип</th>
+            <th style="padding:8px;text-align:right;font-size:10px;color:var(--text2);">Сумма</th>
+            <th style="padding:8px;text-align:left;font-size:10px;color:var(--text2);">Примечание</th>
+          </tr></thead>
+          <tbody>
+            ${all.map(r=>`<tr style="border-top:1px solid var(--border);">
+              <td style="padding:7px 8px;font-size:12px;">${fmtDate(r.date)}</td>
+              <td style="padding:7px 8px;"><span class="badge ${r._type==='Аванс'?'badge-r':'badge-g'}">${r._type}</span></td>
+              <td style="padding:7px 8px;text-align:right;font-size:12px;color:${r._type==='Аванс'?'var(--accent2)':'var(--accent3)'};">${fmt(r.amount)}</td>
+              <td style="padding:7px 8px;font-size:11px;color:var(--text3);">${r.note||'—'}</td>
+            </tr>`).join('')}
+            ${all.length===0?'<tr><td colspan="4"><div class="empty">Нет операций</div></td></tr>':''}
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid var(--border);display:flex;gap:16px;">
+        <span style="font-size:12px;">Авансов: <b style="color:var(--accent2);">${fmt(advs.reduce((s,a)=>s+Number(a.amount||0),0))}</b></span>
+        <span style="font-size:12px;">Выдано: <b style="color:var(--accent3);">${fmt(pays.reduce((s,p)=>s+Number(p.amount||0),0))}</b></span>
       </div>
     </div>`;
-  }).join('');
-
-  return `
-    <div class="stats-grid" style="margin-bottom:20px;">
-      <div class="stat-card"><div class="stat-label">Общие продажи (${curMonth})</div><div class="stat-value y">${fmt(totalSales)}</div>${totalTgtSales>0?`<div class="stat-sub">Цель: ${fmt(totalTgtSales)}</div>`:''}</div>
-      <div class="stat-card"><div class="stat-label">Общая прибыль (${curMonth})</div><div class="stat-value ${totalProfit>=0?'g':'r'}">${fmt(totalProfit)}</div>${totalTgtProfit>0?`<div class="stat-sub">Цель: ${fmt(totalTgtProfit)}</div>`:''}</div>
-      <div class="stat-card"><div class="stat-label">Точек с целями</div><div class="stat-value b">${ptData.filter(p=>p.targetSales>0).length} / ${editable.length}</div></div>
-    </div>
-    <div class="alert alert-success" style="margin-bottom:16px;">☁️ Цели сохраняются в облаке — доступны с любого устройства</div>
-    ${ptCards}
-  `;
 }
+
+function renderNewEmpModal(){
+  return `<div class="modal-overlay" id="staff-modal-overlay">
+    <div class="modal">
+      <div class="modal-head"><h3>➕ Новый сотрудник</h3><button class="close-btn" id="staff-modal-close">✕</button></div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label>ФИО</label><input class="form-control" id="emp-name" placeholder="Имя Фамилия"/></div>
+          <div class="form-group"><label>Должность</label><input class="form-control" id="emp-position" placeholder="Продавец..."/></div>
+          <div class="form-group"><label>Точка</label>
+            <select class="form-control" id="emp-point">
+              <option value="">— выберите —</option>
+              ${POINTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Оклад ₸</label><input type="number" class="form-control" id="emp-salary" placeholder="0"/></div>
+          <div class="form-group"><label>Телефон</label><input class="form-control" id="emp-phone" placeholder="+7..."/></div>
+          <div class="form-group"><label>Дата найма</label><input type="date" class="form-control" id="emp-hire" value="${today()}"/></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="staff-modal-close2">Отмена</button>
+        <button class="btn btn-primary" id="emp-save-btn">Добавить</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderAdvanceModal(){
+  return `<div class="modal-overlay" id="advance-modal-overlay">
+    <div class="modal">
+      <div class="modal-head"><h3>💰 Аванс — ${advanceModal.name}</h3><button class="close-btn" id="advance-close">✕</button></div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="adv-date" value="${today()}"/></div>
+          <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="adv-amount" placeholder="0"/></div>
+          <div class="form-group" style="grid-column:1/-1;"><label>Примечание</label><input class="form-control" id="adv-note" placeholder="Необязательно"/></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="advance-close2">Отмена</button>
+        <button class="btn btn-primary" id="adv-save-btn">Сохранить</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderSalPayModal(){
+  return `<div class="modal-overlay" id="salpay-modal-overlay">
+    <div class="modal">
+      <div class="modal-head"><h3>✅ Зарплата — ${salPayModal.name}</h3><button class="close-btn" id="salpay-close">✕</button></div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="salpay-date" value="${today()}"/></div>
+          <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="salpay-amount" placeholder="0"/></div>
+          <div class="form-group" style="grid-column:1/-1;"><label>Примечание</label><input class="form-control" id="salpay-note" placeholder="Необязательно"/></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="salpay-close2">Отмена</button>
+        <button class="btn btn-primary" id="salpay-save-btn">Сохранить</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function handleStaffImport(input){
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=async(ev)=>{
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false});
+      let hi=-1;
+      for(let i=0;i<Math.min(rows.length,5);i++){
+        const s=(rows[i]||[]).join('|').toLowerCase();
+        if(s.includes('имя')||s.includes('фио')||s.includes('name')){hi=i;break;}
+      }
+      if(hi<0) hi=0;
+      const hdr=(rows[hi]||[]).map(h=>String(h||'').toLowerCase().trim());
+      const iName=hdr.findIndex(h=>h.includes('имя')||h.includes('фио')||h.includes('name'));
+      const iPos=hdr.findIndex(h=>h.includes('должн')||h.includes('позиц')||h.includes('position'));
+      const iPt=hdr.findIndex(h=>h.includes('точк')||h.includes('point')||h.includes('объект'));
+      const iSal=hdr.findIndex(h=>h.includes('оклад')||h.includes('зарпл')||h.includes('salary'));
+      const iPhone=hdr.findIndex(h=>h.includes('телеф')||h.includes('phone'));
+      const ptMap={'17мкр':'mkr17','17-й':'mkr17','mkr17':'mkr17','5мкр':'mkr5','5-й':'mkr5','mkr5':'mkr5','база':'baza','baza':'baza','полфабрикат':'polf','polf':'polf','офис':'ofis','ofis':'ofis'};
+      const parsed=rows.slice(hi+1).filter(r=>r[iName>=0?iName:0]).map(r=>{
+        const ptRaw=String(r[iPt>=0?iPt:2]||'').toLowerCase().trim();
+        const ptId=Object.entries(ptMap).find(([k])=>ptRaw.includes(k))?.[1]||'';
+        return {
+          name:String(r[iName>=0?iName:0]||'').trim(),
+          position:String(r[iPos>=0?iPos:1]||'').trim(),
+          point_id:ptId,
+          monthly_salary:parseFloat(String(r[iSal>=0?iSal:3]||'').replace(/[^0-9.,]/g,'').replace(',','.'))||0,
+          phone:String(r[iPhone>=0?iPhone:-1]||'').trim(),
+          hire_date:today(),
+        };
+      }).filter(r=>r.name);
+      staffImportData=parsed;
+      staffImportMode=true;
+      render();
+      showAlert('success',`Прочитано ${parsed.length} сотрудников`);
+    }catch(err){showAlert('error','Ошибка: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function downloadStaffTemplate(){
+  const rows=[
+    ['ФИО','Должность','Точка','Оклад (₸)','Телефон'],
+    ['Иванов Иван','Продавец','17-й Микрорайон','150000','+77001234567'],
+    ['Петрова Анна','Кассир','База','120000','+77009876543'],
+  ];
+  for(let i=0;i<20;i++) rows.push(['','','','','']);
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:25},{wch:18},{wch:22},{wch:14},{wch:16}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'ПЕРСОНАЛ');
+  XLSX.writeFile(wb,'sablon_personal.xlsx');
+}
+
 
 // ─── BACKUP / RESTORE ────────────────────────────────────────────────────────
 async function downloadBackup(){
