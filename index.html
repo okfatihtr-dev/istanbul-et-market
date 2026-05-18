@@ -1644,14 +1644,14 @@ function renderReport(accessPoints){
     <td><span class="badge badge-b">${c.count}</span></td>
   </tr>`).join('');
 
+  const empMap = {};
+  (STATE.staffCache||[]).forEach(emp=>{ empMap[emp.id]=emp.name; });
+
   const expRows = [
     ...ptExp.map(e=>`<tr><td>${fmtDate(e.date)}</td><td><span class="badge badge-r">${e.type}</span></td><td class="num" style="color:var(--accent2);">${fmt(e.amount)}</td><td class="txt-cut" style="color:var(--text3);">${e.description||'—'}</td></tr>`),
     ...ptAdvances.map(a=>`<tr><td>${fmtDate(a.date)}</td><td><span class="badge badge-r">Аванс</span></td><td class="num" style="color:var(--accent2);">${fmt(a.amount)}</td><td class="txt-cut" style="color:var(--text3);">${empMap[a.employee_id]||'—'}</td></tr>`),
     ...ptSalPayments.map(p=>`<tr><td>${fmtDate(p.date)}</td><td><span class="badge badge-r">Зарплата</span></td><td class="num" style="color:var(--accent2);">${fmt(p.amount)}</td><td class="txt-cut" style="color:var(--text3);">${empMap[p.employee_id]||'—'}</td></tr>`),
   ].join('');
-
-  const empMap = {};
-  (STATE.staffCache||[]).forEach(emp=>{ empMap[emp.id]=emp.name; });
 
   // Store for export buttons
   window._lastReportData = {catData,totSold,totBought,totRem,totExp,totSal,totCosts,profit,dates,
