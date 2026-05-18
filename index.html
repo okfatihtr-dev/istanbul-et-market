@@ -2520,6 +2520,228 @@ function bindEvents(accessPoints){
 
 
 
+// ─── TARGETS / BUDGET ────────────────────────────────────────────────────────
+let targetsState = { saving: {} };
+const TARGET_METRICS = [
+  { key:'sales_target',   label:'Цель продаж',    icon:'🎯', color:'var(--accent)'  },
+  { key:'expense_limit',  label:'Лимит расходов', icon:'💸', color:'var(--accent2)' },
+  { key:'profit_target',  label:'Цель прибыли',   icon:'💰', color:'var(--accent3)' },
+];
+
+function renderTargets(){
+  const last30 = getLast(30);
+  const pts = POINTS.filter(p=>p.id!=='ofis');
+
+  const rows = pts.map(p=>{
+    const tgt = STATE.targets?.[p.id] || {};
+    const pEntries = STATE.entries.filter(e=>e.point_id===p.id&&last30.includes(e.date));
+    const pExp     = STATE.expenses.filter(e=>e.point_id===p.id&&last30.includes(e.date));
+    const actualSales  = pEntries.reduce((s,e)=>s+Number(e.sold||0),0);
+    const actualExp    = pExp.reduce((s,e)=>s+Number(e.amount||0),0);
+    const actualBought = pEntries.reduce((s,e)=>s+Number(e.received||0),0);
+    const allCatsPt = CATS[p.id]||[];
+    const lastRem = allCatsPt.reduce((tot,cat)=>{
+      const last = pEntries.filter(e=>e.category===cat).sort((a,b)=>b.date.localeCompare(a.date))[0];
+      return tot+(last?Number(last.remaining||0):0);
+    },0);
+    const actualProfit = actualSales - actualBought - actualExp + lastRem;
+
+    const actuals = { sales_target: actualSales, expense_limit: actualExp, profit_target: actualProfit };
+
+    return `
+      <div class="table-card" style="margin-bottom:14px;">
+        <div class="table-head"><h3>📍 ${p.name}</h3></div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:16px;">
+          ${TARGET_METRICS.map(m=>{
+            const val    = tgt[m.key] ? Number(tgt[m.key]) : 0;
+            const actual = actuals[m.key] || 0;
+            const pct    = val>0 ? Math.min((actual/val)*100,100).toFixed(0) : 0;
+            const over   = m.key==='expense_limit' ? actual>val&&val>0 : false;
+            const barColor = over ? 'var(--accent2)' : m.color;
+            return `
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+                <span style="font-size:13px;font-weight:600;">${m.icon} ${m.label}</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-size:11px;color:var(--text2);">Факт: <b style="color:${m.color};">${fmt(actual)}</b></span>
+                  <input type="number" 
+                    value="${val||''}" 
+                    placeholder="Введите цель..."
+                    style="width:140px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:12px;color:var(--text);font-family:'Inter',sans-serif;outline:none;"
+                    onfocus="this.style.borderColor='var(--accent)'"
+                    onblur="this.style.borderColor='var(--border)';saveTarget('${p.id}','${m.key}',this.value)"
+                  />
+                </div>
+              </div>
+              ${val>0?`
+              <div style="height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;">
+                <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .6s;"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:4px;">
+                <span style="font-size:10px;color:var(--text3);">${pct}% выполнено</span>
+                <span style="font-size:10px;color:var(--text3);">Цель: ${fmt(val)}</span>
+              </div>`:'<div style="height:8px;background:var(--bg3);border-radius:4px;"></div>'}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  // Overall summary
+  const totSales30  = STATE.entries.filter(e=>last30.includes(e.date)).reduce((s,e)=>s+Number(e.sold||0),0);
+  const totExp30    = STATE.expenses.filter(e=>last30.includes(e.date)).reduce((s,e)=>s+Number(e.amount||0),0);
+  const totBought30 = STATE.entries.filter(e=>last30.includes(e.date)).reduce((s,e)=>s+Number(e.received||0),0);
+
+  return `
+    <div class="alert alert-warn" style="margin-bottom:16px;">
+      📅 Показатели за последние 30 дней. Введите цели — прогресс обновится автоматически.
+    </div>
+    <div class="stats-grid" style="margin-bottom:20px;">
+      <div class="stat-card"><div class="stat-label">Продажи (30 дн)</div><div class="stat-value y">${fmt(totSales30)}</div></div>
+      <div class="stat-card"><div class="stat-label">Расходы (30 дн)</div><div class="stat-value r">${fmt(totExp30)}</div></div>
+      <div class="stat-card"><div class="stat-label">Закуп (30 дн)</div><div class="stat-value b">${fmt(totBought30)}</div></div>
+    </div>
+    <div class="section-title">Цели по точкам</div>
+    ${rows}
+  `;
+}
+
+async function saveTarget(pointId, metric, value){
+  const val = parseFloat(value)||0;
+  if(!STATE.targets) STATE.targets={};
+  if(!STATE.targets[pointId]) STATE.targets[pointId]={};
+  STATE.targets[pointId][metric] = val;
+  // Upsert into targets table
+  const {error} = await sb.from('targets')
+    .upsert({point_id:pointId, metric, value:val}, {onConflict:'point_id,metric'});
+  if(error) showAlert('error','Ошибка сохранения: '+error.message);
+  else showAlert('success','Цель сохранена');
+}
+
+// ─── CARILER (DEBTORS) ───────────────────────────────────────────────────────
+let carilerLoaded = false;
+let carilerData   = [];
+let carilerModal  = null;
+let paymentModal  = null;
+let carilerPoint  = '';
+
+function renderCariler(){
+  const accessPts = STATE.user.role==='admin'
+    ? POINTS.filter(p=>['mkr17','mkr5','baza'].includes(p.id))
+    : POINTS.filter(p=>p.id===STATE.user.point_id);
+
+  if(!carilerPoint && accessPts[0]) carilerPoint = accessPts[0].id;
+
+  if(!carilerLoaded){
+    sb.from('debtors').select('*, debtor_payments(*)').order('created_at',{ascending:false})
+      .then(({data,error})=>{
+        if(!error){ carilerData=data||[]; carilerLoaded=true; render(); }
+      });
+    return `<div class="loading-screen" style="min-height:200px;"><div class="spinner"></div><p>Загрузка...</p></div>`;
+  }
+
+  const ptData = carilerData.filter(d=>d.point_id===carilerPoint);
+  const totalDebt  = ptData.reduce((s,d)=>s+Number(d.total_debt||0),0);
+  const totalPaid  = ptData.reduce((s,d)=>s+(d.debtor_payments||[]).reduce((x,p)=>x+Number(p.amount||0),0),0);
+  const totalRem   = totalDebt - totalPaid;
+
+  const tabs = accessPts.map(p=>`
+    <div class="tab ${carilerPoint===p.id?'active':''}" onclick="carilerPoint='${p.id}';render();">${p.name}</div>
+  `).join('');
+
+  const debtorRows = ptData.map(d=>{
+    const paid = (d.debtor_payments||[]).reduce((s,p)=>s+Number(p.amount||0),0);
+    const rem  = Number(d.total_debt||0) - paid;
+    const pct  = d.total_debt>0 ? Math.min((paid/d.total_debt)*100,100).toFixed(0) : 0;
+    return `<tr>
+      <td class="txt-cut"><b>${d.name}</b><br><span style="font-size:10px;color:var(--text3);">${d.phone||'—'}</span></td>
+      <td class="num" style="color:#60a5fa;">${fmt(d.total_debt)}</td>
+      <td class="num" style="color:var(--accent3);">${fmt(paid)}</td>
+      <td class="num" style="color:${rem>0?'var(--accent2)':'var(--accent3)'};">${fmt(rem)}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden;min-width:50px;">
+            <div style="height:100%;width:${pct}%;background:var(--accent3);border-radius:3px;"></div>
+          </div>
+          <span style="font-size:10px;color:var(--text3);">${pct}%</span>
+        </div>
+      </td>
+      <td>${fmtDate(d.date)}</td>
+      <td class="txt-cut" style="color:var(--text3);font-size:11px;">${d.description||'—'}</td>
+      <td>
+        <div class="actions-cell">
+          ${rem>0?`<button class="btn btn-success" style="padding:3px 8px;font-size:10px;" 
+            onclick="paymentModal={id:'${d.id}',name:'${d.name.replace(/'/g,"\\'")}',remaining:${rem}};render();">💳 Оплата</button>`:'<span class="badge badge-g">✓ Закрыт</span>'}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const addModal = carilerModal ? `
+    <div class="modal-overlay" id="caril-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>📒 Новый должник</h3><button class="close-btn" onclick="carilerModal=null;render();">✕</button></div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group"><label>Имя *</label><input class="form-control" id="c-name" placeholder="ФИО"/></div>
+            <div class="form-group"><label>Телефон</label><input class="form-control" id="c-phone" placeholder="+7..."/></div>
+            <div class="form-group"><label>Сумма долга ₸ *</label><input type="number" class="form-control" id="c-debt" placeholder="0"/></div>
+            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="c-date" value="${today()}"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Описание</label><input class="form-control" id="c-desc" placeholder="Необязательно"/></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" onclick="carilerModal=null;render();">Отмена</button>
+          <button class="btn btn-primary" id="caril-save-btn">Добавить</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  const payModal = paymentModal ? `
+    <div class="modal-overlay" id="pay-overlay">
+      <div class="modal">
+        <div class="modal-head"><h3>💳 Оплата — ${paymentModal.name}</h3><button class="close-btn" onclick="paymentModal=null;render();">✕</button></div>
+        <div class="modal-body">
+          <div class="alert alert-warn" style="margin-bottom:12px;">Остаток долга: <b>${fmt(paymentModal.remaining)}</b></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Дата</label><input type="date" class="form-control" id="pay-date" value="${today()}"/></div>
+            <div class="form-group"><label>Сумма ₸</label><input type="number" class="form-control" id="pay-amount" placeholder="0"/></div>
+            <div class="form-group" style="grid-column:1/-1;"><label>Примечание</label><input class="form-control" id="pay-note" placeholder="Необязательно"/></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-ghost" onclick="paymentModal=null;render();">Отмена</button>
+          <button class="btn btn-primary" id="pay-save-btn">Сохранить</button>
+        </div>
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="tabs">${tabs}</div>
+    <div class="stats-grid" style="margin-bottom:16px;">
+      <div class="stat-card"><div class="stat-label">Общий долг</div><div class="stat-value b">${fmt(totalDebt)}</div></div>
+      <div class="stat-card"><div class="stat-label">Оплачено</div><div class="stat-value g">${fmt(totalPaid)}</div></div>
+      <div class="stat-card"><div class="stat-label">Остаток</div><div class="stat-value r">${fmt(totalRem)}</div></div>
+      <div class="stat-card"><div class="stat-label">Должников</div><div class="stat-value y">${ptData.length}</div></div>
+    </div>
+    <div class="table-card">
+      <div class="table-head">
+        <h3>Карточки должников</h3>
+        <button class="btn btn-primary" style="font-size:12px;" onclick="carilerModal=true;render();">+ Добавить</button>
+      </div>
+      <div class="table-scroll">
+        <table style="table-layout:fixed;min-width:700px;width:100%;">
+          <colgroup><col style="width:18%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:14%"><col style="width:10%"><col style="width:15%"><col style="width:10%"></colgroup>
+          <thead><tr><th>Имя</th><th class="num">Долг</th><th class="num">Оплачено</th><th class="num">Остаток</th><th>Прогресс</th><th>Дата</th><th>Описание</th><th></th></tr></thead>
+          <tbody>${debtorRows||'<tr><td colspan="8"><div class="empty">Нет должников</div></td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+    ${addModal}
+    ${payModal}
+  `;
+}
+
 // ─── PROFILE ──────────────────────────────────────────────────────────────────
 function renderProfile(){
   const u = STATE.user;
