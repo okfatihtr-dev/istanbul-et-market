@@ -14,34 +14,106 @@
   --accent:#f59e0b;--accent2:#f87171;--accent3:#34d399;
   --text:#f0f2f7;--text2:#b0bac8;--text3:#7a8499;
   --card:#22262f;--hover:#2e3342;
+  --win-title:#1a1d23;--win-menu:#22262f;--win-menu-hover:#363c4a;
+  --win-menu-active:#f59e0b;
 }
 .light{
   --bg:#f0f2f7;--bg2:#ffffff;--bg3:#e8eaf0;--border:#d0d5e0;
   --text:#1a1e2e;--text2:#4a5568;--text3:#8892a4;
   --card:#ffffff;--hover:#f5f7fc;
+  --win-title:#e0e3ea;--win-menu:#f0f2f7;--win-menu-hover:#dde0e8;
+  --win-menu-active:#f59e0b;
 }
 body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;transition:background .3s,color .3s;}
-.app{display:flex;min-height:100vh;}
-.sidebar{width:250px;min-height:100vh;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100;}
-.logo{padding:20px;border-bottom:1px solid var(--border);}
-.logo h1{font-family:'Unbounded',sans-serif;font-size:12px;font-weight:700;color:var(--accent);line-height:1.4;}
-.logo p{font-size:10px;color:var(--text3);margin-top:4px;}
-.nav{flex:1;padding:12px 0;overflow-y:auto;}
-.nav-label{font-size:9px;font-weight:600;color:var(--text2);letter-spacing:.15em;text-transform:uppercase;padding:8px 16px 4px;}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;border-left:3px solid transparent;font-size:13px;color:var(--text2);transition:all .2s;}
-.nav-item:hover{background:var(--hover);color:var(--text);}
-.nav-item.active{background:var(--hover);color:var(--accent);border-left-color:var(--accent);font-weight:500;}
-.sidebar-footer{padding:12px;border-top:1px solid var(--border);}
-.user-badge{display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg3);border-radius:10px;}
-.user-avatar{width:30px;height:30px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#000;flex-shrink:0;}
-.user-info p{font-size:12px;font-weight:500;}
-.user-info span{font-size:10px;color:var(--text3);}
-.logout-btn{margin-left:auto;background:none;border:none;cursor:pointer;font-size:16px;color:var(--text3);}
-.main{margin-left:250px;flex:1;display:flex;flex-direction:column;}
-.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:50;}
-.topbar h2{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:600;}
-.topbar-right{display:flex;align-items:center;gap:10px;}
-.content{padding:24px;flex:1;}
+
+/* ── WINDOWS TITLE BAR ── */
+.win-titlebar{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--win-title);border-bottom:1px solid var(--border);
+  padding:0 12px;height:32px;user-select:none;position:sticky;top:0;z-index:200;
+}
+.win-titlebar-left{display:flex;align-items:center;gap:8px;}
+.win-titlebar-icon{font-size:14px;}
+.win-titlebar-text{font-family:'Unbounded',sans-serif;font-size:11px;font-weight:600;color:var(--accent);letter-spacing:.02em;}
+.win-titlebar-status{font-size:9px;color:var(--text3);margin-left:6px;}
+.win-titlebar-controls{display:flex;align-items:center;gap:0;}
+.win-ctrl-btn{
+  width:36px;height:32px;border:none;background:transparent;
+  cursor:pointer;font-size:13px;color:var(--text2);
+  display:flex;align-items:center;justify-content:center;transition:background .15s;
+}
+.win-ctrl-btn:hover{background:var(--hover);}
+.win-ctrl-btn.close:hover{background:#e81123;color:#fff;}
+
+/* ── WINDOWS MENU BAR (Ribbon-style) ── */
+.win-menubar{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--win-menu);border-bottom:1px solid var(--border);
+  padding:0 8px;height:40px;position:sticky;top:32px;z-index:190;
+  overflow-x:auto;-webkit-overflow-scrolling:touch;
+}
+.win-menu-left{display:flex;align-items:center;gap:2px;flex:1;min-width:0;overflow-x:auto;}
+.win-menu-right{display:flex;align-items:center;gap:6px;flex-shrink:0;padding-left:8px;}
+.win-menu-item{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 14px;border-radius:4px;cursor:pointer;
+  font-size:12px;font-weight:500;color:var(--text2);
+  white-space:nowrap;transition:all .15s;border:1px solid transparent;
+  background:transparent;
+}
+.win-menu-item:hover{background:var(--win-menu-hover);color:var(--text);border-color:var(--border);}
+.win-menu-item.active{
+  background:var(--bg);color:var(--accent);
+  border-color:var(--border);font-weight:600;
+  border-bottom:2px solid var(--accent);
+}
+.win-menu-item .menu-icon{font-size:14px;line-height:1;}
+.win-menu-item .menu-label{font-size:12px;}
+
+.win-menu-sep{width:1px;height:22px;background:var(--border);margin:0 4px;flex-shrink:0;}
+
+/* ── RIBBON TOOLBAR (below menu for contextual actions) ── */
+.win-ribbon{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:6px 16px;min-height:38px;position:sticky;top:72px;z-index:180;
+  flex-wrap:wrap;gap:6px;
+}
+.win-ribbon-left{display:flex;align-items:center;gap:8px;}
+.win-ribbon-left h2{font-family:'Unbounded',sans-serif;font-size:13px;font-weight:600;}
+.win-ribbon-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+
+/* ── USER CHIP (top right) ── */
+.user-chip{
+  display:flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;
+  background:var(--bg3);border-radius:16px;cursor:default;border:1px solid var(--border);
+}
+.user-chip-avatar{
+  width:24px;height:24px;border-radius:50%;background:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:#000;flex-shrink:0;
+}
+.user-chip-name{font-size:11px;font-weight:500;color:var(--text);}
+.user-chip-role{font-size:9px;color:var(--text3);}
+
+/* ── LAYOUT ── */
+.app{display:flex;flex-direction:column;min-height:100vh;}
+.main{flex:1;display:flex;flex-direction:column;}
+.content{padding:20px 24px;flex:1;max-width:1400px;margin:0 auto;width:100%;}
+
+/* ── POINTS BAR (below ribbon, optional) ── */
+.win-points-bar{
+  display:flex;align-items:center;gap:6px;padding:4px 16px;
+  background:var(--bg3);border-bottom:1px solid var(--border);
+  font-size:10px;color:var(--text3);overflow-x:auto;
+}
+.win-point-badge{
+  display:inline-flex;align-items:center;gap:3px;
+  padding:2px 8px;border-radius:4px;background:var(--bg2);
+  border:1px solid var(--border);font-size:10px;color:var(--text2);white-space:nowrap;
+}
+
+/* ── REUSE ALL ORIGINAL COMPONENT STYLES ── */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:500;font-family:'Inter',sans-serif;transition:all .2s;}
 .btn:disabled{opacity:.5;cursor:not-allowed;}
 .btn-primary{background:var(--accent);color:#000;}
@@ -49,7 +121,7 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-h
 .btn-ghost:hover:not(:disabled){background:var(--hover);}
 .btn-danger{background:rgba(239,68,68,.1);color:var(--accent2);border:1px solid rgba(239,68,68,.2);}
 .btn-success{background:rgba(16,185,129,.1);color:var(--accent3);border:1px solid rgba(16,185,129,.2);}
-.theme-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:15px;}
+.theme-btn{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;}
 .stat-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;}
@@ -90,7 +162,7 @@ select.form-control option{background:var(--bg2);}
 .tab{padding:7px 14px;border-radius:8px;border:1px solid var(--border);font-size:12px;font-weight:500;cursor:pointer;background:var(--bg2);color:var(--text2);transition:all .2s;}
 .tab:hover{color:var(--text);border-color:var(--accent);}
 .tab.active{background:var(--accent);color:#000;border-color:var(--accent);}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
 .modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;}
 .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);}
 .modal-head h3{font-family:'Unbounded',sans-serif;font-size:12px;font-weight:600;}
@@ -139,35 +211,56 @@ tr:hover .grid-cell{border-color:var(--border);}
 
 /* ── MOBILE ── */
 .hamburger{display:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);cursor:pointer;font-size:18px;align-items:center;justify-content:center;}
-.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;backdrop-filter:blur(2px);}
-.sidebar-overlay.open{display:block;}
+/* Mobile menu overlay for top nav */
+.mobile-menu-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:250;backdrop-filter:blur(2px);}
+.mobile-menu-overlay.open{display:block;}
+.mobile-menu-panel{
+  display:none;position:fixed;top:32px;left:0;right:0;
+  background:var(--bg2);border-bottom:2px solid var(--accent);
+  z-index:260;padding:12px;max-height:80vh;overflow-y:auto;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.mobile-menu-panel.open{display:block;}
+.mobile-menu-panel .win-menu-item{
+  padding:10px 14px;border-radius:8px;font-size:13px;width:100%;
+}
+
+/* ── STATUS BAR (bottom) ── */
+.win-statusbar{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--bg2);border-top:1px solid var(--border);
+  padding:3px 16px;height:24px;font-size:10px;color:var(--text3);
+  position:sticky;bottom:0;z-index:100;
+}
+
 @media(max-width:768px){
   .hamburger{display:flex;}
-  .sidebar{transform:translateX(-100%);transition:transform .3s;z-index:100;}
-  .sidebar.open{transform:translateX(0);}
-  .main{margin-left:0;}
+  .win-menubar .win-menu-left{display:none;}
+  .win-menubar .win-menu-left.mobile-show{display:flex;flex-direction:column;position:fixed;top:72px;left:0;right:0;background:var(--bg2);z-index:260;padding:8px;border-bottom:2px solid var(--accent);box-shadow:0 8px 32px rgba(0,0,0,.4);}
+  .win-menubar .win-menu-left.mobile-show .win-menu-item{width:100%;padding:10px 14px;}
+  .win-menubar .win-menu-left.mobile-show .win-menu-sep{width:100%;height:1px;margin:4px 0;}
   .content{padding:14px;}
-  .topbar{padding:10px 14px;}
   .stats-grid{grid-template-columns:1fr 1fr;gap:10px;}
   .stat-card{padding:14px;}
   .stat-value{font-size:15px;}
-
-  /* Tables → card view on mobile */
-  /* mobile-cards only on very small screens */
-
   .point-tabs,.tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;}
   .tab,.point-tab{flex-shrink:0;}
   .form-grid{grid-template-columns:1fr;}
   .modal{margin:8px;max-height:95vh;}
   .profit-box .profit-value{font-size:20px;}
-  .topbar h2{font-size:12px;}
   .btn{font-size:11px;padding:7px 12px;}
+  .user-chip-name,.user-chip-role{display:none;}
+  .win-ribbon-left h2{font-size:12px;}
 }
 @media(max-width:480px){
   .hide-mobile{display:none;}
   .stats-grid{grid-template-columns:1fr;}
-  .topbar-right .btn span{display:none;}
+  .win-ribbon-right .btn span{display:none;}
 }
+
+/* Hide old sidebar classes if any remain */
+.sidebar{display:none!important;}
+.sidebar-overlay{display:none!important;}
 </style>
 </head>
 <body>
@@ -314,15 +407,18 @@ function render(){
 
   app.innerHTML = `
     ${STATE.alert ? `<div class="top-alert alert alert-${STATE.alert.type}">${STATE.alert.msg}</div>` : ''}
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <div class="mobile-menu-overlay" id="mobile-menu-overlay"></div>
     <div class="app">
-      ${renderSidebar(accessPoints)}
+      ${renderTitleBar()}
+      ${renderMenuBar(accessPoints)}
+      ${renderPointsBar(accessPoints)}
       <div class="main">
-        ${renderTopbar()}
+        ${renderRibbon()}
         <div class="content" id="page-content">
           ${renderPage(accessPoints)}
         </div>
       </div>
+      ${renderStatusBar()}
     </div>
   `;
   bindEvents(accessPoints);
@@ -371,62 +467,95 @@ function bindLogin(){
   document.getElementById('pass-input')?.addEventListener('keydown',e=>{if(e.key==='Enter')tryLogin();});
 }
 
-// ─── SIDEBAR ────────────────────────────────────────────────────────────────
-function renderSidebar(accessPoints){
-  const nav = [
-    {id:'dashboard',icon:'📊',label:'Главная'},
-    {id:'entry',icon:'📝',label:'Ввод данных'},
-    {id:'expenses',icon:'💸',label:'Расходы / Зарплаты'},
-    {id:'bank',icon:'🏦',label:'Банк (Офис)'},
-    {id:'report',icon:'📈',label:'Отчёт'},
-    ...(STATE.user.role==='admin'?[{id:'users',icon:'👥',label:'Пользователи'}]:[]),
-    ...(STATE.user.role==='admin'?[{id:'staff',icon:'💼',label:'Персонал / Зарплаты'}]:[]),
-    ...(STATE.user.role==='admin'?[{id:'targets',icon:'🎯',label:'Цели / Бюджет'}]:[]),
-    ...(['admin','operator'].includes(STATE.user.role)&&['mkr17','mkr5','baza',null].includes(STATE.user.point_id)?[{id:'cariler',icon:'📒',label:'Карточки должников'}]:[]),
-    {id:'profile',icon:'👤',label:'Мой профиль'},
-  ];
-  const navItems = nav.map(n=>`
-    <div class="nav-item ${STATE.page===n.id?'active':''}" data-page="${n.id}">
-      <span>${n.icon}</span><span>${n.label}</span>
-    </div>
-  `).join('');
-  const pts = accessPoints.map(p=>`<div class="nav-item" style="font-size:11px;"><span>📍</span><span>${p.name}</span></div>`).join('');
-  const u = STATE.user;
+// ─── WINDOWS TITLE BAR + MENU BAR ────
+function renderTitleBar(){
   return `
-    <div class="sidebar">
-      <div class="logo">
-        <h1>ISTANBUL ET MARKET</h1>
-        <p><span class="online-dot"></span>Онлайн · ${u.role==='admin'?'Администратор':'Оператор'}</p>
+    <div class="win-titlebar">
+      <div class="win-titlebar-left">
+        <span class="win-titlebar-icon">🥩</span>
+        <span class="win-titlebar-text">ISTANBUL ET MARKET</span>
+        <span class="win-titlebar-status">— Учёт Системы</span>
       </div>
-      <nav class="nav">
-        <div class="nav-label">Навигация</div>
-        ${navItems}
-        <div class="nav-label" style="margin-top:8px;">Мои точки</div>
-        ${pts}
-      </nav>
-      <div class="sidebar-footer">
-        <div class="user-badge">
-          <div class="user-avatar">${u.name[0]}</div>
-          <div class="user-info"><p>${u.name}</p><span>${u.role==='admin'?'Администратор':'Оператор'}</span></div>
-          <button class="logout-btn" id="logout-btn" title="Выйти">↩</button>
-        </div>
+      <div class="win-titlebar-controls">
+        <button class="win-ctrl-btn" title="Свернуть">─</button>
+        <button class="win-ctrl-btn" title="Развернуть">☐</button>
+        <button class="win-ctrl-btn close" title="Закрыть">✕</button>
       </div>
     </div>
   `;
 }
 
-// ─── TOPBAR ─────────────────────────────────────────────────────────────────
-function renderTopbar(){
+function renderMenuBar(accessPoints){
+  const nav = [
+    {id:'dashboard',icon:'📊',label:'Главная'},
+    {id:'entry',icon:'📝',label:'Ввод данных'},
+    {id:'expenses',icon:'💸',label:'Расходы'},
+    {id:'bank',icon:'🏦',label:'Банк'},
+    {id:'report',icon:'📈',label:'Отчёт'},
+    ...(STATE.user.role==='admin'?[{id:'users',icon:'👥',label:'Пользователи'}]:[]),
+    ...(STATE.user.role==='admin'?[{id:'staff',icon:'💼',label:'Персонал'}]:[]),
+    ...(STATE.user.role==='admin'?[{id:'targets',icon:'🎯',label:'Цели'}]:[]),
+    ...(['admin','operator'].includes(STATE.user.role)&&['mkr17','mkr5','baza',null].includes(STATE.user.point_id)?[{id:'cariler',icon:'📒',label:'Должники'}]:[]),
+    {id:'profile',icon:'👤',label:'Профиль'},
+  ];
+  const menuItems = nav.map(n=>`
+    <div class="win-menu-item ${STATE.page===n.id?'active':''}" data-page="${n.id}">
+      <span class="menu-icon">${n.icon}</span><span class="menu-label">${n.label}</span>
+    </div>
+  `).join('');
+  const u = STATE.user;
   return `
-    <div class="topbar">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <button class="hamburger" id="hamburger-btn">☰</button>
-        <div><h2>${PAGE_TITLES[STATE.page]||STATE.page}</h2><span style="font-size:11px;color:var(--text3);">${fmtDate(today())}</span></div>
+    <div class="win-menubar">
+      <div class="win-menu-left" id="win-menu-left">
+        ${menuItems}
       </div>
-      <div class="topbar-right">
-        ${STATE.user?.role==='admin'?`<button class="btn btn-success" id="backup-btn" style="padding:6px 12px;"><span>💾</span><span class="hide-mobile"> Yedek Al</span></button>
-        <label class="btn btn-ghost" style="cursor:pointer;padding:6px 12px;" title="Yedekten Geri Yukle">📂<span class="hide-mobile"> Yukle</span><input type="file" id="restore-file" accept=".json" style="display:none;"/></label>`:''}
-        <button class="btn btn-ghost" id="refresh-btn" style="padding:6px 12px;">🔄 Обновить</button>
+      <div class="win-menu-right">
+        <div class="user-chip">
+          <div class="user-chip-avatar">${u.name[0]}</div>
+          <div style="display:flex;flex-direction:column;line-height:1.2;">
+            <span class="user-chip-name">${u.name}</span>
+            <span class="user-chip-role">${u.role==='admin'?'Админ':'Оператор'}</span>
+          </div>
+        </div>
+        <button class="btn btn-ghost" id="logout-btn" style="padding:4px 10px;font-size:11px;" title="Выйти">↩ Выход</button>
+        <button class="hamburger" id="hamburger-btn">☰</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderPointsBar(accessPoints){
+  const pts = accessPoints.map(p=>`<span class="win-point-badge">📍 ${p.name}</span>`).join('');
+  return `<div class="win-points-bar"><span style="margin-right:4px;">Мои точки:</span>${pts}</div>`;
+}
+
+function renderStatusBar(){
+  const u = STATE.user;
+  return `
+    <div class="win-statusbar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span><span class="online-dot"></span>Подключено к облаку</span>
+        <span>|</span>
+        <span>${u.role==='admin'?'Администратор':'Оператор'}: ${u.name}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span>${fmtDate(today())}</span>
+      </div>
+    </div>
+  `;
+}
+
+// ─── RIBBON TOOLBAR ────
+function renderRibbon(){
+  return `
+    <div class="win-ribbon">
+      <div class="win-ribbon-left">
+        <h2>${PAGE_TITLES[STATE.page]||STATE.page}</h2>
+      </div>
+      <div class="win-ribbon-right">
+        ${STATE.user?.role==='admin'?`<button class="btn btn-success" id="backup-btn" style="padding:5px 10px;font-size:11px;"><span>💾</span><span class="hide-mobile"> Yedek Al</span></button>
+        <label class="btn btn-ghost" style="cursor:pointer;padding:5px 10px;font-size:11px;" title="Yedekten Geri Yukle">📂<span class="hide-mobile"> Yukle</span><input type="file" id="restore-file" accept=".json" style="display:none;"/></label>`:''}
+        <button class="btn btn-ghost" id="refresh-btn" style="padding:5px 10px;font-size:11px;">🔄<span class="hide-mobile"> Обновить</span></button>
         <button class="theme-btn" id="theme-btn">${STATE.theme==='dark'?'☀️':'🌙'}</button>
       </div>
     </div>
@@ -2011,20 +2140,22 @@ function renderUsers(){
 
 // ─── BIND EVENTS ─────────────────────────────────────────────────────────────
 function bindEvents(accessPoints){
-  // Hamburger menu
+  // Hamburger menu (mobile)
   document.getElementById('hamburger-btn')?.addEventListener('click',()=>{
-    document.querySelector('.sidebar')?.classList.toggle('open');
-    document.getElementById('sidebar-overlay')?.classList.toggle('open');
+    const ml = document.getElementById('win-menu-left');
+    const ov = document.getElementById('mobile-menu-overlay');
+    ml?.classList.toggle('mobile-show');
+    ov?.classList.toggle('open');
   });
-  document.getElementById('sidebar-overlay')?.addEventListener('click',()=>{
-    document.querySelector('.sidebar')?.classList.remove('open');
-    document.getElementById('sidebar-overlay')?.classList.remove('open');
+  document.getElementById('mobile-menu-overlay')?.addEventListener('click',()=>{
+    document.getElementById('win-menu-left')?.classList.remove('mobile-show');
+    document.getElementById('mobile-menu-overlay')?.classList.remove('open');
   });
-  // Close sidebar on nav click (mobile)
+  // Close mobile menu on nav click
   document.querySelectorAll('[data-page]').forEach(el=>{
     el.addEventListener('click',()=>{
-      document.querySelector('.sidebar')?.classList.remove('open');
-      document.getElementById('sidebar-overlay')?.classList.remove('open');
+      document.getElementById('win-menu-left')?.classList.remove('mobile-show');
+      document.getElementById('mobile-menu-overlay')?.classList.remove('open');
     });
   });
 
@@ -3493,5 +3624,6 @@ STATE.loading=false;
 render();
 if(STATE.user) loadAll();
 </script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v833ccba57c9e4d2798f2e76cebdd09a11778172276447" integrity="sha512-57MDmcccJXYtNnH+ZiBwzC4jb2rvgVCEokYN+L/nLlmO8rfYT/gIpW2A569iJ/3b+0UEasghjuZH/ma3wIs/EQ==" data-cf-beacon='{"version":"2024.11.0","token":"f0f03d0605bf45f1a3b17cf7d5e6861f","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
